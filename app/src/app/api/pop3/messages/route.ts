@@ -4,15 +4,25 @@ import * as net from "net";
 import { simpleParser } from "mailparser";
 
 export const dynamic = "force-dynamic";
-export const runtime  = "nodejs";
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
+const CONNECT_TIMEOUT = 8_000;
+const READ_TIMEOUT = 8_000;
 
 function tcpConnect(host: string, port: number, ssl: boolean): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("연결 시간 초과 (15초)")), 15_000);
+    const timeout = setTimeout(
+      () => reject(new Error(`연결 시간 초과 — ${host}:${port} 응답 없음 (서버가 연결을 차단했거나 주소가 잘못됐을 수 있습니다)`)),
+      CONNECT_TIMEOUT
+    );
     let sock: net.Socket;
     const onConnect = () => { clearTimeout(timeout); resolve(sock); };
     if (ssl) {
-      sock = tls.connect({ host, port, rejectUnauthorized: false }, onConnect);
+      sock = tls.connect(
+        { host, port, rejectUnauthorized: false, servername: host },
+        onConnect
+      );
     } else {
       sock = net.createConnection({ host, port }, onConnect);
     }
@@ -39,10 +49,10 @@ class Pop3Session {
     });
   }
 
-  readLine(timeoutMs = 30_000): Promise<string> {
+  readLine(timeoutMs = READ_TIMEOUT): Promise<string> {
     if (this.ready.length) return Promise.resolve(this.ready.shift()!);
     return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error("POP3 읽기 시간 초과")), timeoutMs);
+      const t = setTimeout(() => reject(new Error("POP3 응답 대기 시간 초과")), timeoutMs);
       this.pending.push((l) => { clearTimeout(t); resolve(l); });
     });
   }
@@ -89,6 +99,8 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
+  console.log(`[POP3] connecting → ${host}:${port} ssl=${ssl} user=${user}`);
+
   let session: Pop3Session | null = null;
   try {
     const sock = await tcpConnect(host, port, ssl);
@@ -107,18 +119,18 @@ export async function POST(request: NextRequest) {
     if (!statResp.startsWith("+OK")) throw new Error(`STAT 실패: ${statResp}`);
     const total = parseInt(statResp.split(" ")[1] ?? "0", 10);
 
+    console.log(`[POP3] authenticated. total=${total}`);
+
     const messages: unknown[] = [];
     const fetchCount = Math.min(limit, total);
 
     for (let i = total; i > total - fetchCount && i >= 1; i--) {
       try {
-        // TOP: get headers + 5 body lines for preview
         const topResp = await session.cmd(`TOP ${i} 5`);
         let rawLines: string[];
         if (topResp.startsWith("+OK")) {
           rawLines = await session.readMultiLine();
         } else {
-          // Some servers don't support TOP — fall back to full RETR
           const retrResp = await session.cmd(`RETR ${i}`);
           if (!retrResp.startsWith("+OK")) continue;
           rawLines = await session.readMultiLine();
@@ -146,16 +158,19 @@ export async function POST(request: NextRequest) {
           attachmentCount: 0,
         });
       } catch {
-        // Skip unreadable messages
+        // skip unreadable individual messages
       }
     }
 
     try { await session.cmd("QUIT"); } catch {}
     session.destroy();
 
+    console.log(`[POP3] done. returned ${messages.length} messages`);
     return NextResponse.json(messages);
   } catch (e: unknown) {
+    const msg = String(e);
+    console.error(`[POP3] FAILED host=${host} port=${port} ssl=${ssl}:`, msg);
     session?.destroy();
-    return NextResponse.json({ error: String(e) }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
