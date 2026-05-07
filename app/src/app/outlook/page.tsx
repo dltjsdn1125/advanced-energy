@@ -289,9 +289,13 @@ async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ host, port, ssl, user, pass, limit }),
   });
-  const data = await res.json();
-  if (data?.error) throw new Error(`POP3 오류: ${data.error}`);
-  return Array.isArray(data) ? data : [];
+  const data = await res.json() as { error?: string } | OutlookMessage[];
+  if (!res.ok || (data as { error?: string })?.error) {
+    const raw = String((data as { error?: string })?.error ?? `HTTP ${res.status}`)
+      .replace(/^Error:\s*/gi, "").trim();
+    throw new Error(`POP3 연결 실패: ${raw}\n설정 → POP3 항목에서 서버 주소와 계정 정보를 확인하세요.`);
+  }
+  return Array.isArray(data) ? data as OutlookMessage[] : [];
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -576,10 +580,14 @@ export default function OutlookPage() {
             data = pop3Msgs;
           } else {
             // POP3 설정 없음 → 안내 메시지
-            throw new Error("Outlook을 사용할 수 없습니다.\n설정 → POP3 계정 정보를 입력하면 메일을 불러올 수 있습니다.");
+            throw new Error("Outlook을 사용할 수 없습니다.\n설정 → POP3 항목에서 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다.");
           }
         } else {
-          throw new Error("이 폴더는 POP3로 조회할 수 없습니다 (받은편지함/보낸편지함만 지원)");
+          // drafts/deleted/junk: POP3 미지원 → 조용히 빈 목록
+          const empty: OutlookMessage[] = [];
+          setFolderCache(folder, empty);
+          setMessages(empty); setLoadingCount(0);
+          return;
         }
       }
 
