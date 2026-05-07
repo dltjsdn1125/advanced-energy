@@ -1,8 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
 from supabase._async.client import AsyncClient, create_client as async_create_client
-from functools import lru_cache
 from config import get_settings
 
 security = HTTPBearer()
@@ -20,23 +18,19 @@ async def get_supabase() -> AsyncClient:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncClient = Depends(get_supabase),
 ) -> dict:
-    cfg = get_settings()
     try:
-        payload = jwt.decode(
-            credentials.credentials,
-            cfg.supabase_jwt_secret,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-        user_id: str | None = payload.get("sub")
-        email: str | None = payload.get("email")
-        if not user_id:
+        # Supabase validates the JWT on their end — no local secret needed
+        resp = await db.auth.get_user(credentials.credentials)
+        user = resp.user
+        if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        user_metadata = payload.get("user_metadata", {}) or {}
-        is_admin = bool(user_metadata.get("is_admin", False))
-        return {"user_id": user_id, "email": email, "is_admin": is_admin}
-    except JWTError:
+        is_admin = bool((user.user_metadata or {}).get("is_admin", False))
+        return {"user_id": user.id, "email": user.email, "is_admin": is_admin}
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

@@ -272,30 +272,26 @@ function RecipientModal({ pool: initPool, onConfirm, onClose }: {
   );
 }
 
-// ── POP3 fallback: reads credentials from localStorage, returns null on failure ─
+// ── POP3 fallback: returns null if no POP3 settings, throws on connection error ─
 async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
-  try {
-    const raw = localStorage.getItem("ae_settings_v1");
-    if (!raw) return null;
-    const cfg  = JSON.parse(raw) as Record<string, unknown>;
-    const host = String(cfg.popHost ?? "");
-    const port = Number(cfg.popPort) || 995;
-    const ssl  = cfg.popSsl !== false && cfg.popSsl !== "false";
-    const user = String(cfg.popUser ?? "");
-    const pass = String(cfg.popPass ?? "");
-    if (!host || !user || !pass) return null;
+  const raw = localStorage.getItem("ae_settings_v1");
+  if (!raw) return null;
+  const cfg  = JSON.parse(raw) as Record<string, unknown>;
+  const host = String(cfg.popHost ?? "");
+  const port = Number(cfg.popPort) || 995;
+  const ssl  = cfg.popSsl !== false && cfg.popSsl !== "false";
+  const user = String(cfg.popUser ?? "");
+  const pass = String(cfg.popPass ?? "");
+  if (!host || !user || !pass) return null; // POP3 미설정 → 조용히 건너뜀
 
-    const res  = await fetch("/api/pop3/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ host, port, ssl, user, pass, limit }),
-    });
-    const data = await res.json();
-    if (data?.error) throw new Error(data.error);
-    return Array.isArray(data) ? data : null;
-  } catch {
-    return null;
-  }
+  const res  = await fetch("/api/pop3/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ host, port, ssl, user, pass, limit }),
+  });
+  const data = await res.json();
+  if (data?.error) throw new Error(`POP3 오류: ${data.error}`);
+  return Array.isArray(data) ? data : [];
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -579,10 +575,11 @@ export default function OutlookPage() {
           if (pop3Msgs !== null) {
             data = pop3Msgs;
           } else {
-            throw new Error(data?.error ?? "Outlook을 사용할 수 없습니다");
+            // POP3 설정 없음 → 안내 메시지
+            throw new Error("Outlook을 사용할 수 없습니다.\n설정 → POP3 계정 정보를 입력하면 메일을 불러올 수 있습니다.");
           }
         } else {
-          throw new Error(data?.error ?? "Outlook을 사용할 수 없습니다");
+          throw new Error("이 폴더는 POP3로 조회할 수 없습니다 (받은편지함/보낸편지함만 지원)");
         }
       }
 

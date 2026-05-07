@@ -4,6 +4,7 @@ import * as net from "net";
 import { simpleParser } from "mailparser";
 
 export const dynamic = "force-dynamic";
+export const runtime  = "nodejs";
 
 function tcpConnect(host: string, port: number, ssl: boolean): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
