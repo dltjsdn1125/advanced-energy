@@ -209,9 +209,11 @@ export default function SettingsPage() {
         for (const key of Object.keys(merged) as Array<keyof Config>) {
           const v = apiData[key];
           if (typeof v === "boolean") {
-            (merged as Record<string, unknown>)[key] = v;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (merged as any)[key] = v;
           } else if (typeof v === "string" && v !== "") {
-            (merged as Record<string, unknown>)[key] = v;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (merged as any)[key] = v;
           }
         }
         setCfg(merged);
