@@ -63,76 +63,14 @@ async function fetchBody(
   cookie: string,
   uid: string,
 ): Promise<{ htmlBody: string; body: string }> {
-  // Try multiple MAILNARA view URL patterns until one returns 200
-  const candidates = [
-    `https://${host}/new_mailnara_web/index.php/mail/view_mail/Inbox/${uid}`,
-    `https://${host}/new_mailnara_web/index.php/mail/mail_read/Inbox/${uid}`,
-    `https://${host}/new_mailnara_web/index.php/mail/read_mail/Inbox/${uid}`,
-    `https://${host}/new_mailnara_web/index.php/mail/mail_content/Inbox/${uid}`,
-    `https://${host}/new_mailnara_web/index.php/mail/mail_print/Inbox/${uid}`,
-    `https://${host}/new_mailnara_web/index.php/mail/mail_source/Inbox/${uid}`,
-    `https://${host}/new_mailnara_web/index.php/mail/mail_view/Inbox/${uid}`,
-  ];
-
-  let html = "";
-  let usedUrl = "";
-  for (const url of candidates) {
-    const r = await fetch(url, { headers: { Cookie: cookie } });
-    console.log(`[WEBMAIL-THREAD] try ${url.split("/").slice(-3).join("/")} → ${r.status}`);
-    if (r.ok) {
-      html = await r.text();
-      usedUrl = url;
-      break;
-    }
-  }
-  if (!html) throw new Error(`메일 본문을 가져올 수 없습니다 (모든 URL 패턴 실패)`);
-
-  console.log(`[WEBMAIL-THREAD] got html from ${usedUrl} len=${html.length} preview=${html.slice(0, 300).replace(/\n/g, " ").replace(/\s+/g, " ")}`);
-
-  // 1) Look for iframe that holds the mail body
-  const iframeMatch = html.match(
-    /src=["']([^"']*(?:mail_body|view_body|body)[^"']*)["']/i,
-  ) || html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-
-  if (iframeMatch) {
-    const src = iframeMatch[1];
-    const iframeUrl = src.startsWith("http")
-      ? src
-      : `https://${host}${src.startsWith("/") ? src : "/" + src}`;
-    console.log(`[WEBMAIL-THREAD] fetching iframe src=${iframeUrl}`);
-    const ir = await fetch(iframeUrl, { headers: { Cookie: cookie } });
-    if (ir.ok) {
-      const ih = await ir.text();
-      return { htmlBody: injectFont(ih), body: stripTags(ih).slice(0, 2000) };
-    }
-  }
-
-  // 2) Try known MAILNARA body container IDs/classes
-  const bodyPatterns: RegExp[] = [
-    /id=["']viewMailBody["'][^>]*>([\s\S]+?)(?=<div[^>]+id=["']|$)/i,
-    /id=["']mail_body_text["'][^>]*>([\s\S]+?)(?=<\/div>)/i,
-    /id=["']mailContent["'][^>]*>([\s\S]+?)(?=<\/div>)/i,
-    /class=["']view-mail-body[^"']*["'][^>]*>([\s\S]+?)(?=<\/div>)/i,
-    /class=["']mail-body[^"']*["'][^>]*>([\s\S]+?)(?=<\/div>)/i,
-    /id=["']view_mail_content["'][^>]*>([\s\S]+?)(?=<\/div>)/i,
-  ];
-  for (const pat of bodyPatterns) {
-    const m = html.match(pat);
-    if (m && m[1].trim().length > 30) {
-      const content = m[1].trim();
-      return {
-        htmlBody: injectFont(`<html><body style="margin:0;padding:10px 18px">${content}</body></html>`),
-        body: stripTags(content).slice(0, 2000),
-      };
-    }
-  }
-
-  // 3) Fallback: whole page (remove nav/header cruft, keep <body>)
-  const bodyTagMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  return {
-    htmlBody: injectFont(html),
-    body: stripTags(bodyTagMatch ? bodyTagMatch[1] : html).slice(0, 2000),
-  };
+  // MAILNARA 4.x: body is in an iframe at maildecode/mail_content_body
+  const bodyUrl = `https://${host}/new_mailnara_web/index.php/maildecode/mail_content_body/Inbox/${uid}/N/N`;
+  console.log(`[WEBMAIL-THREAD] fetching body url: ${bodyUrl}`);
+  const resp = await fetch(bodyUrl, { headers: { Cookie: cookie } });
+  if (!resp.ok) throw new Error(`메일 본문 HTTP ${resp.status}`);
+  const html = await resp.text();
+  console.log(`[WEBMAIL-THREAD] body html len=${html.length}`);
+  return { htmlBody: injectFont(html), body: stripTags(html).slice(0, 2000) };
 }
 
 export async function POST(request: NextRequest) {
