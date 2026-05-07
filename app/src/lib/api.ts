@@ -14,7 +14,7 @@ function getSb() {
   return _sb;
 }
 
-async function getToken(): Promise<string | null> {
+export async function getToken(): Promise<string | null> {
   const sb = getSb();
   // getUser() contacts Supabase server → validates & auto-refreshes expired token
   const { data: { user }, error } = await sb.auth.getUser();

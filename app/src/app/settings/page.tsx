@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { getToken } from "@/lib/api";
 
 interface Config {
   openaiKey: string;
@@ -181,7 +181,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const HAS_API = Boolean(process.env.NEXT_PUBLIC_API_URL);
+const HAS_API = true; // Next.js /api/settings route always available
 
 export default function SettingsPage() {
   const [cfg, setCfg] = useState<Config>(DEFAULTS);
@@ -193,14 +193,22 @@ export default function SettingsPage() {
   useEffect(() => {
     const local = loadLocal();
     setCfg(local);
-    if (!HAS_API) return;
-    apiFetch<ApiSettings>("/settings")
-      .then(data => {
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const res = await fetch("/api/settings", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json() as ApiSettings;
         const merged = { ...local, ...fromApi(data) };
         setCfg(merged);
         setCloudSync(true);
-      })
-      .catch(() => {});
+      } catch {
+        // local fallback already applied above
+      }
+    })();
   }, []);
 
   function set<K extends keyof Config>(k: K, v: Config[K]) {
@@ -210,16 +218,21 @@ export default function SettingsPage() {
   async function save() {
     setSaveError("");
     saveLocal(cfg);
-    if (HAS_API) {
-      try {
-        await apiFetch("/settings", {
-          method: "PUT",
-          body: JSON.stringify(toApi(cfg)),
-        });
-        setCloudSync(true);
-      } catch (e: unknown) {
-        setSaveError("Cloud save failed: " + String(e));
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("로그인이 필요합니다");
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(toApi(cfg)),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text}`);
       }
+      setCloudSync(true);
+    } catch (e: unknown) {
+      setSaveError("Cloud save failed: " + String(e));
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -265,11 +278,7 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-[20px] font-bold text-ink-900">Settings</h1>
             <p className="text-[13px] text-ink-500">
-              {HAS_API
-                ? cloudSync
-                  ? "☁ Cloud synced — saved to Supabase"
-                  : "☁ Syncing with cloud…"
-                : "설정은 브라우저 localStorage에 저장됩니다"}
+              {cloudSync ? "☁ Cloud synced — saved to Supabase" : "☁ Syncing with cloud…"}
             </p>
           </div>
           <button
