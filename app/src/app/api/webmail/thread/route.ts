@@ -44,14 +44,16 @@ async function mailnaraLogin(host: string, user: string, pass: string): Promise<
 const FONT_CSS = `<style>
 html,body{overflow:hidden!important;margin:0!important;}
 body{padding:10px 18px!important;}
-*{font-family:'고운돋움','Goun Dotum','Dotum','돋움','Gulim','굴림',Arial,sans-serif!important;font-size:11px!important;line-height:1.65!important;}
+*{font-family:'고운돋움','Goun Dotum','Dotum','돋움','Gulim','굴림',Arial,sans-serif!important;font-size:13px!important;line-height:1.65!important;}
 img{max-width:100%!important;height:auto!important;display:inline-block!important;}
 </style>`;
 
-function injectFont(html: string): string {
-  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, FONT_CSS + "</head>");
-  if (/<body/i.test(html)) return html.replace(/<body/i, FONT_CSS + "<body");
-  return FONT_CSS + html;
+function injectFont(html: string, baseHref?: string): string {
+  const baseTag = baseHref ? `<base href="${baseHref}">` : "";
+  const inject  = baseTag + FONT_CSS;
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, inject + "</head>");
+  if (/<body/i.test(html)) return html.replace(/<body/i, inject + "<body");
+  return inject + html;
 }
 
 function stripTags(html: string): string {
@@ -62,15 +64,17 @@ async function fetchBody(
   host: string,
   cookie: string,
   uid: string,
+  mailbox = "Inbox",
 ): Promise<{ htmlBody: string; body: string }> {
   // MAILNARA 4.x: body is in an iframe at maildecode/mail_content_body
-  const bodyUrl = `https://${host}/new_mailnara_web/index.php/maildecode/mail_content_body/Inbox/${uid}/N/N`;
+  const bodyUrl = `https://${host}/new_mailnara_web/index.php/maildecode/mail_content_body/${mailbox}/${uid}/N/N`;
   console.log(`[WEBMAIL-THREAD] fetching body url: ${bodyUrl}`);
   const resp = await fetch(bodyUrl, { headers: { Cookie: cookie } });
   if (!resp.ok) throw new Error(`메일 본문 HTTP ${resp.status}`);
   const html = await resp.text();
   console.log(`[WEBMAIL-THREAD] body html len=${html.length}`);
-  return { htmlBody: injectFont(html), body: stripTags(html).slice(0, 2000) };
+  const baseHref = `https://${host}/`;
+  return { htmlBody: injectFont(html, baseHref), body: stripTags(html).slice(0, 2000) };
 }
 
 export async function POST(request: NextRequest) {
@@ -79,6 +83,7 @@ export async function POST(request: NextRequest) {
   const user        = String(body.user        ?? "");
   const pass        = String(body.pass        ?? "");
   const uid         = String(body.uid         ?? "");
+  const mailbox     = String(body.mailbox     ?? "Inbox");
   const subject     = String(body.subject     ?? "");
   const senderName  = String(body.senderName  ?? "");
   const senderEmail = String(body.senderEmail ?? "");
@@ -92,7 +97,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const cookie = await mailnaraLogin(host, user, pass);
-    const { htmlBody, body: plainBody } = await fetchBody(host, cookie, uid);
+    const { htmlBody, body: plainBody } = await fetchBody(host, cookie, uid, mailbox);
 
     const thread = [{
       entryId:     `web-${uid}`,

@@ -238,7 +238,7 @@ function RecipientModal({ pool: initPool, onConfirm, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex w-full max-w-[700px] flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ height: 520, resize: "none" }}>
+      <div className="flex w-full max-w-[700px] flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ height: "min(520px, 90dvh)" }}>
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-ink-100 px-5 py-3">
           <h2 className="text-[15px] font-semibold">수신자 선택</h2>
@@ -257,12 +257,12 @@ function RecipientModal({ pool: initPool, onConfirm, onClose }: {
           <ZoneBox zone="cc"    label="참조 (CC)"      color="text-purple-600"/>
         </div>
         {/* Footer */}
-        <div className="flex shrink-0 items-center justify-between border-t border-ink-100 px-5 py-3">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-ink-100 px-5 py-3">
           <p className="text-[11px] text-ink-400">받는 사람이 비어있으면 원본 수신자로 발송됩니다</p>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="rounded border border-ink-200 px-4 py-1.5 text-[13px] text-ink-600 hover:bg-ink-50">취소</button>
+          <div className="flex flex-row gap-2">
+            <button onClick={onClose} className="flex-1 rounded border border-ink-200 px-4 py-1.5 text-[13px] text-ink-600 hover:bg-ink-50">취소</button>
             <button onClick={() => onConfirm(toList, ccList)}
-              className="rounded bg-[#0078d4] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#005fa3]">
+              className="flex-1 rounded bg-[#0078d4] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#005fa3]">
               확인
             </button>
           </div>
@@ -331,7 +331,7 @@ async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
 }
 
 // ── Webmail (MAILNARA) fallback: uses POP3 host/user/pass via HTTPS ───────────
-async function tryWebmailFetch(): Promise<OutlookMessage[] | null> {
+async function tryWebmailFetch(folder = "inbox"): Promise<OutlookMessage[] | null> {
   const raw = localStorage.getItem("ae_settings_v1");
   if (!raw) return null;
   const cfg  = JSON.parse(raw) as Record<string, unknown>;
@@ -339,7 +339,7 @@ async function tryWebmailFetch(): Promise<OutlookMessage[] | null> {
   const user = String(cfg.popUser ?? "");
   const pass = String(cfg.popPass ?? "");
   if (!host || !user || !pass) return null;
-  return callMailApi("/api/webmail/messages", { host, user, pass }, "Webmail");
+  return callMailApi("/api/webmail/messages", { host, user, pass, folder }, "Webmail");
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -616,13 +616,13 @@ export default function OutlookPage() {
       const res = await fetch(`/api/outlook/messages?${qs}`);
       let data  = await res.json();
 
-      // ── Mail fallback: IMAP → POP3 (non-Windows / Outlook not running) ────────
+      // ── Mail fallback: IMAP → POP3 → Webmail (non-Windows / Outlook not running) ─
       if (res.status === 503 || data?.error) {
-        if (folder === "inbox" || folder === "sent") {
-          let mailMsgs: OutlookMessage[] | null = null;
-          let connError = "";
+        let mailMsgs: OutlookMessage[] | null = null;
+        let connError = "";
 
-          // 1) IMAP
+        if (folder === "inbox" || folder === "sent") {
+          // 1) IMAP (inbox/sent only)
           const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
           if ("ok" in imapResult && imapResult.ok !== null) {
             mailMsgs = imapResult.ok;
@@ -639,34 +639,28 @@ export default function OutlookPage() {
               connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
             }
           }
+        }
 
-          // 3) Webmail scraper (POP3/IMAP IP 차단 시 HTTPS로 우회)
-          if (mailMsgs === null) {
-            const webResult = await tryWebmailFetch().then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-            if ("ok" in webResult && webResult.ok !== null) {
-              mailMsgs = webResult.ok;
-              connError = ""; // webmail succeeded — clear prior protocol errors
-            } else if ("err" in webResult) {
-              connError = connError ? `${connError}\n${webResult.err}` : webResult.err;
-            }
+        // 3) Webmail scraper — all folders (POP3/IMAP IP 차단 또는 drafts/deleted/junk)
+        if (mailMsgs === null) {
+          const webResult = await tryWebmailFetch(folder).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+          if ("ok" in webResult && webResult.ok !== null) {
+            mailMsgs = webResult.ok;
+            connError = "";
+          } else if ("err" in webResult) {
+            connError = connError ? `${connError}\n${webResult.err}` : webResult.err;
           }
+        }
 
-          if (mailMsgs !== null) {
-            data = mailMsgs;
-          } else if (connError) {
-            throw new Error(`${connError}\n\n설정 → IMAP/POP3 서버 주소와 계정 정보를 확인하세요.`);
-          } else {
-            throw new Error(
-              "Outlook을 사용할 수 없습니다.\n" +
-              "설정 → IMAP 또는 POP3 항목에 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다."
-            );
-          }
+        if (mailMsgs !== null) {
+          data = mailMsgs;
+        } else if (connError) {
+          throw new Error(`${connError}\n\n설정 → IMAP/POP3 서버 주소와 계정 정보를 확인하세요.`);
         } else {
-          // drafts/deleted/junk: 미지원 → 조용히 빈 목록
-          const empty: OutlookMessage[] = [];
-          setFolderCache(folder, empty);
-          setMessages(empty); setLoadingCount(0);
-          return;
+          throw new Error(
+            "Outlook을 사용할 수 없습니다.\n" +
+            "설정 → IMAP 또는 POP3 항목에 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다."
+          );
         }
       }
 
@@ -788,7 +782,11 @@ export default function OutlookPage() {
       let fetchedMsgs: unknown[];
       if (msg.entryId.startsWith("web-")) {
         // MAILNARA webmail — Outlook COM 없이 HTTPS로 본문 가져오기
-        const uid = msg.entryId.slice(4);
+        // entryId format: "web-{uid}" for Inbox, "web-{Mailbox}:{uid}" for other folders
+        const raw2 = msg.entryId.slice(4);
+        const colonIdx = raw2.indexOf(":");
+        const mailbox = colonIdx >= 0 ? raw2.slice(0, colonIdx) : "Inbox";
+        const uid     = colonIdx >= 0 ? raw2.slice(colonIdx + 1) : raw2;
         const raw = localStorage.getItem("ae_settings_v1");
         const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
         const res = await fetch("/api/webmail/thread", {
@@ -799,6 +797,7 @@ export default function OutlookPage() {
             user:        String(cfg.popUser        ?? ""),
             pass:        String(cfg.popPass        ?? ""),
             uid,
+            mailbox,
             subject:     msg.subject,
             senderName:  msg.senderName,
             senderEmail: msg.senderEmail,
@@ -2076,7 +2075,7 @@ export default function OutlookPage() {
 
       {transModalOpen && transResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="flex w-full max-w-[1200px] flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ maxHeight: "90vh" }}>
+          <div className="flex w-full max-w-[1200px] flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ maxHeight: "90dvh" }}>
             <div className="flex shrink-0 items-center justify-between border-b border-ink-100 px-5 py-3">
               <span className="text-[14px] font-semibold">Translation ({transLang})</span>
               <button onClick={() => setTransModalOpen(false)}
@@ -2102,7 +2101,7 @@ export default function OutlookPage() {
                 }}
               />
             </div>
-            <div className="flex shrink-0 justify-end gap-2 border-t border-ink-100 px-5 py-3">
+            <div className="flex shrink-0 flex-row gap-2 border-t border-ink-100 px-5 py-3">
               <button
                 onClick={async () => {
                   try {
@@ -2120,11 +2119,11 @@ export default function OutlookPage() {
                     setTimeout(() => setCopyDone(false), 2000);
                   } catch {}
                 }}
-                className="rounded border border-[#0f3460] px-4 py-1.5 text-[12px] font-medium text-[#0f3460] hover:bg-[#0f3460] hover:text-white transition whitespace-nowrap">
+                className="flex-1 rounded border border-[#0f3460] px-4 py-1.5 text-[12px] font-medium text-[#0f3460] hover:bg-[#0f3460] hover:text-white transition whitespace-nowrap">
                 Copy
               </button>
               <button onClick={() => setTransModalOpen(false)}
-                className="rounded bg-[#0f3460] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#0a2342] whitespace-nowrap">
+                className="flex-1 rounded bg-[#0f3460] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#0a2342] whitespace-nowrap">
                 Close
               </button>
             </div>
@@ -2151,8 +2150,10 @@ export default function OutlookPage() {
 
       {/* ── Compose popup window ─────────────────────────────────────────── */}
       {composeOpen && (
-        <div className="fixed bottom-4 right-4 z-50 flex w-[540px] flex-col rounded-xl border border-ink-200 bg-white shadow-2xl"
-          style={{ maxHeight: "calc(100dvh - 80px)" }}>
+        <div className="fixed z-50 flex flex-col rounded-xl border border-ink-200 bg-white shadow-2xl
+          bottom-0 right-0 left-0 w-full rounded-b-none
+          sm:bottom-4 sm:right-4 sm:left-auto sm:w-[540px] sm:rounded-xl"
+          style={{ maxHeight: "calc(100dvh - 48px)" }}>
           {/* Title bar */}
           <div className="flex shrink-0 items-center justify-between rounded-t-xl bg-[#0f3460] px-4 py-2.5">
             <span className="text-[13px] font-semibold text-white">
@@ -2218,19 +2219,19 @@ export default function OutlookPage() {
             );
           })()}
           {/* Footer */}
-          <div className="flex shrink-0 items-center justify-between border-t border-ink-100 px-4 py-3">
+          <div className="flex shrink-0 flex-col gap-2 border-t border-ink-100 px-4 py-3">
             {replyStatus && (
               <span className={`text-[11px] font-medium ${replyStatus.startsWith("✓") ? "text-green-600" : replyStatus.includes("중") ? "text-ink-400" : "text-red-500"}`}>
                 {replyStatus}
               </span>
             )}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="flex flex-row items-center gap-2">
               <button onClick={() => { setComposeOpen(false); setComposeBody(""); }}
-                className="rounded border border-ink-200 px-4 py-1.5 text-[12px] text-ink-600 hover:bg-ink-50 whitespace-nowrap">
+                className="flex-1 rounded border border-ink-200 px-4 py-1.5 text-[12px] text-ink-600 hover:bg-ink-50 whitespace-nowrap">
                 Cancel
               </button>
               <button onClick={sendCompose} disabled={composeSending || !composeToStr.trim()}
-                className={`flex items-center gap-1.5 rounded px-4 py-1.5 text-[12px] font-semibold transition whitespace-nowrap ${
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded px-4 py-1.5 text-[12px] font-semibold transition whitespace-nowrap ${
                   composeSending || !composeToStr.trim()
                     ? "bg-ink-100 text-ink-400 cursor-not-allowed"
                     : "bg-[#0078d4] text-white hover:bg-[#005fa3]"
@@ -2831,7 +2832,7 @@ export default function OutlookPage() {
                         <div style={{ overflowX: "auto", overflowY: "hidden" }}>
                           <iframe
                             srcDoc={(() => {
-                              const fontCss = `@import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');*,*::before,*::after,body,p,span,div,td,th,li,a,font,b,i,em,strong,h1,h2,h3,h4,h5,h6{font-family:'Gowun Dodum','고운돋움','Goun Dotum','Dotum',Arial,sans-serif!important;font-size:11px!important;line-height:1.65!important;}html,body{overflow:visible!important;margin:0!important;}`;
+                              const fontCss = `@import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');*,*::before,*::after,body,p,span,div,td,th,li,a,font,b,i,em,strong,h1,h2,h3,h4,h5,h6{font-family:'Gowun Dodum','고운돋움','Goun Dotum','Dotum',Arial,sans-serif!important;font-size:13px!important;line-height:1.65!important;}html,body{overflow:visible!important;margin:0!important;}`;
                               if (msg.htmlBody) return `<style>${fontCss}</style>` + msg.htmlBody;
                               return `<html><head><style>${fontCss}body{color:#1a1a1a;padding:12px 18px;white-space:pre-wrap}</style></head><body>${
                                 (msg.body || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")

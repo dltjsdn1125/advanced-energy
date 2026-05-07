@@ -78,7 +78,7 @@ async function mailnaraLogin(
   return cookiePairs.join("; ");
 }
 
-function parseMailList(html: string): unknown[] {
+function parseMailList(html: string, mailbox = "Inbox"): unknown[] {
   const messages: unknown[] = [];
 
   // Split on each row_id boundary — more robust than lookahead regex
@@ -122,9 +122,10 @@ function parseMailList(html: string): unknown[] {
     // attachment icon
     const hasAttach = /class=["']m-file["']/.test(block) && !/style=["'][^"']*display\s*:\s*none/.test(block);
 
+    const entryId = mailbox === "Inbox" ? `web-${uid}` : `web-${mailbox}:${uid}`;
     messages.push({
-      entryId: `web-${uid}`,
-      conversationId: `web-${uid}`,
+      entryId,
+      conversationId: entryId,
       subject,
       senderName: fromName || fromEmail,
       senderEmail: fromEmail,
@@ -142,17 +143,28 @@ function parseMailList(html: string): unknown[] {
 const PAGE_SIZE = 200; // messages per MAILNARA page request
 const FETCH_TIMEOUT_MS = 25_000; // stop paging 5s before Vercel's 30s limit
 
+const MAILBOX_MAP: Record<string, string> = {
+  inbox:   "Inbox",
+  sent:    "Sent",
+  drafts:  "Temp",
+  deleted: "Trash",
+  junk:    "Advert",
+};
+
 export async function POST(request: NextRequest) {
   const body = await request.json() as Record<string, unknown>;
-  const host = String(body.host ?? "");
-  const user = String(body.user ?? "");
-  const pass = String(body.pass ?? "");
+  const host   = String(body.host   ?? "");
+  const user   = String(body.user   ?? "");
+  const pass   = String(body.pass   ?? "");
+  const folder = String(body.folder ?? "inbox").toLowerCase();
+
+  const mailbox = MAILBOX_MAP[folder] ?? "Inbox";
 
   if (!host || !user || !pass) {
     return NextResponse.json({ error: "webmail 설정이 필요합니다 (host, user, pass)" }, { status: 400 });
   }
 
-  console.log(`[WEBMAIL] connecting → https://${host} user=${user}`);
+  console.log(`[WEBMAIL] connecting → https://${host} user=${user} mailbox=${mailbox}`);
 
   try {
     const cookie = await mailnaraLogin(host, user, pass);
@@ -168,7 +180,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      const listUrl = `https://${host}/new_mailnara_web/index.php/mail/mail_list/Inbox/${page}/${PAGE_SIZE}`;
+      const listUrl = `https://${host}/new_mailnara_web/index.php/mail/mail_list/${mailbox}/${page}/${PAGE_SIZE}`;
       const listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
       if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
 
@@ -180,7 +192,7 @@ export async function POST(request: NextRequest) {
         const snippet = rowIdx >= 0 ? html.slice(Math.max(0, rowIdx - 50), rowIdx + 500) : html.slice(0, 500);
         console.log(`[WEBMAIL] page0 html snippet: ${snippet.replace(/\n/g, " ").replace(/\s+/g, " ")}`);
       }
-      const msgs = parseMailList(html);
+      const msgs = parseMailList(html, mailbox);
       console.log(`[WEBMAIL] page=${page} got=${msgs.length}`);
 
       if (msgs.length === 0) break;
