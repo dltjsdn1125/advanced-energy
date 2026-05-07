@@ -202,7 +202,18 @@ export default function SettingsPage() {
         });
         if (!res.ok) return;
         const data = await res.json() as ApiSettings;
-        const merged = { ...local, ...fromApi(data) };
+        // Merge: DB values override local ONLY for non-empty strings and booleans.
+        // Prevents an empty DB row ({}) from wiping out locally saved values.
+        const apiData = fromApi(data);
+        const merged: Config = { ...local };
+        for (const key of Object.keys(merged) as Array<keyof Config>) {
+          const v = apiData[key];
+          if (typeof v === "boolean") {
+            (merged as Record<string, unknown>)[key] = v;
+          } else if (typeof v === "string" && v !== "") {
+            (merged as Record<string, unknown>)[key] = v;
+          }
+        }
         setCfg(merged);
         setCloudSync(true);
       } catch {
