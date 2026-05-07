@@ -331,7 +331,7 @@ async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
 }
 
 // ── Webmail (MAILNARA) fallback: uses POP3 host/user/pass via HTTPS ───────────
-async function tryWebmailFetch(limit: number): Promise<OutlookMessage[] | null> {
+async function tryWebmailFetch(): Promise<OutlookMessage[] | null> {
   const raw = localStorage.getItem("ae_settings_v1");
   if (!raw) return null;
   const cfg  = JSON.parse(raw) as Record<string, unknown>;
@@ -339,7 +339,7 @@ async function tryWebmailFetch(limit: number): Promise<OutlookMessage[] | null> 
   const user = String(cfg.popUser ?? "");
   const pass = String(cfg.popPass ?? "");
   if (!host || !user || !pass) return null;
-  return callMailApi("/api/webmail/messages", { host, user, pass, limit }, "Webmail");
+  return callMailApi("/api/webmail/messages", { host, user, pass }, "Webmail");
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -642,7 +642,7 @@ export default function OutlookPage() {
 
           // 3) Webmail scraper (POP3/IMAP IP 차단 시 HTTPS로 우회)
           if (mailMsgs === null) {
-            const webResult = await tryWebmailFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+            const webResult = await tryWebmailFetch().then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
             if ("ok" in webResult && webResult.ok !== null) {
               mailMsgs = webResult.ok;
               connError = ""; // webmail succeeded — clear prior protocol errors

@@ -139,12 +139,14 @@ function parseMailList(html: string): unknown[] {
   return messages;
 }
 
+const PAGE_SIZE = 200; // messages per MAILNARA page request
+const FETCH_TIMEOUT_MS = 25_000; // stop paging 5s before Vercel's 30s limit
+
 export async function POST(request: NextRequest) {
   const body = await request.json() as Record<string, unknown>;
-  const host  = String(body.host ?? "");
-  const user  = String(body.user ?? "");
-  const pass  = String(body.pass ?? "");
-  const limit = Math.min(Number(body.limit) || 50, 200);
+  const host = String(body.host ?? "");
+  const user = String(body.user ?? "");
+  const pass = String(body.pass ?? "");
 
   if (!host || !user || !pass) {
     return NextResponse.json({ error: "webmail 설정이 필요합니다 (host, user, pass)" }, { status: 400 });
@@ -156,17 +158,33 @@ export async function POST(request: NextRequest) {
     const cookie = await mailnaraLogin(host, user, pass);
     console.log(`[WEBMAIL] login ok, cookie=${cookie.slice(0, 40)}…`);
 
-    const listUrl = `https://${host}/new_mailnara_web/index.php/mail/mail_list/Inbox/0/${limit}`;
-    const listResp = await fetch(listUrl, {
-      headers: { Cookie: cookie },
-    });
+    const allMessages: unknown[] = [];
+    const started = Date.now();
+    let page = 0;
 
-    if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
-    const html = await listResp.text();
+    while (true) {
+      if (Date.now() - started > FETCH_TIMEOUT_MS) {
+        console.log(`[WEBMAIL] timeout guard hit — stopping at page=${page} total=${allMessages.length}`);
+        break;
+      }
 
-    const messages = parseMailList(html);
-    console.log(`[WEBMAIL] done. returned ${messages.length} messages`);
-    return NextResponse.json(messages);
+      const listUrl = `https://${host}/new_mailnara_web/index.php/mail/mail_list/Inbox/${page}/${PAGE_SIZE}`;
+      const listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
+      if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
+
+      const html = await listResp.text();
+      const msgs = parseMailList(html);
+      console.log(`[WEBMAIL] page=${page} got=${msgs.length}`);
+
+      if (msgs.length === 0) break;
+      allMessages.push(...msgs);
+      if (msgs.length < PAGE_SIZE) break; // partial page = last page
+
+      page++;
+    }
+
+    console.log(`[WEBMAIL] done. total=${allMessages.length} messages (${page + 1} pages)`);
+    return NextResponse.json(allMessages);
   } catch (e: unknown) {
     const msg = String(e).replace(/^Error:\s*/gi, "");
     console.error(`[WEBMAIL] FAILED:`, msg);
