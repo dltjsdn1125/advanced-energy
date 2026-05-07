@@ -272,6 +272,32 @@ function RecipientModal({ pool: initPool, onConfirm, onClose }: {
   );
 }
 
+// ── POP3 fallback: reads credentials from localStorage, returns null on failure ─
+async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
+  try {
+    const raw = localStorage.getItem("ae_settings_v1");
+    if (!raw) return null;
+    const cfg  = JSON.parse(raw) as Record<string, unknown>;
+    const host = String(cfg.popHost ?? "");
+    const port = Number(cfg.popPort) || 995;
+    const ssl  = cfg.popSsl !== false && cfg.popSsl !== "false";
+    const user = String(cfg.popUser ?? "");
+    const pass = String(cfg.popPass ?? "");
+    if (!host || !user || !pass) return null;
+
+    const res  = await fetch("/api/pop3/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ host, port, ssl, user, pass, limit }),
+    });
+    const data = await res.json();
+    if (data?.error) throw new Error(data.error);
+    return Array.isArray(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function OutlookPage() {
   const [openaiKey,    setOpenaiKey]    = useState("");
@@ -542,10 +568,24 @@ export default function OutlookPage() {
     }
     setMsgLoading(true);
     try {
-      const qs   = new URLSearchParams({ folder });
-      const res  = await fetch(`/api/outlook/messages?${qs}`);
-      const data = await res.json();
-      if (data?.error) throw new Error(data.error);
+      const qs  = new URLSearchParams({ folder });
+      const res = await fetch(`/api/outlook/messages?${qs}`);
+      let data  = await res.json();
+
+      // ── POP3 fallback (non-Windows / Outlook not running) ─────────────────────
+      if (res.status === 503 || data?.error) {
+        if (folder === "inbox" || folder === "sent") {
+          const pop3Msgs = await tryPop3Fetch(50);
+          if (pop3Msgs !== null) {
+            data = pop3Msgs;
+          } else {
+            throw new Error(data?.error ?? "Outlook을 사용할 수 없습니다");
+          }
+        } else {
+          throw new Error(data?.error ?? "Outlook을 사용할 수 없습니다");
+        }
+      }
+
       const msgs: OutlookMessage[] = Array.isArray(data) ? data : [];
       setFolderCache(folder, msgs);
       setMessages(msgs); setLoadingCount(msgs.length);
@@ -556,7 +596,6 @@ export default function OutlookPage() {
       } else if (msgs.length > 0) {
         selectMessage(msgs[0]);
       }
-      // Prefetch threads for next visible messages in background
       msgs.slice(1, 6).forEach(m => prefetchThread(m));
     } catch (e: unknown) {
       if (!cached || forceRefresh) setMsgError(String(e));

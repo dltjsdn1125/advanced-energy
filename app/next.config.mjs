@@ -9,6 +9,13 @@ const nextConfig = {
     : {}),
   images: { unoptimized: true },
   serverExternalPackages: ["imapflow", "mailparser", "nodemailer"],
+  async redirects() {
+    if (isStaticExport) return [];
+    return [
+      { source: "/filter", destination: "/finder", permanent: true },
+      { source: "/filter/", destination: "/finder", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

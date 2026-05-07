@@ -27,7 +27,7 @@ async def get_current_user(
             credentials.credentials,
             cfg.supabase_jwt_secret,
             algorithms=["HS256"],
-            audience="authenticated",
+            options={"verify_aud": False},
         )
         user_id: str | None = payload.get("sub")
         email: str | None = payload.get("email")
