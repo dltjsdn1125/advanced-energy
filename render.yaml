@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: advanced-energy-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        value: https://xtdhhqqjsdgifgcmelmd.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0ZGhocXFqc2RnaWZnY21lbG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwODA4NjMsImV4cCI6MjA5MzY1Njg2M30.KwoCZ_S_qk6EQZrLocplplQj5FhxaYh2mBrhTJuFz1U
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0ZGhocXFqc2RnaWZnY21lbG1kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODA4MDg2MywiZXhwIjoyMDkzNjU2ODYzfQ.K86tSDrUJZ05yA5Ri3c16ahrQu7nNydUSYD_PMHslvo
+      - key: SUPABASE_JWT_SECRET
+        value: fGTqhOzuDv41+TNUKCicJl7to0HVTbIasHkXnuiEtphoBEV9VliX2etrdRPn7Wtg3slCQVglmFA4wRKmb2DNAA==
+      - key: DATA_DIR
+        value: ../data
+      - key: ALLOWED_ORIGINS
+        value: https://advanced-energy-chlelee217-gmailcoms-projects.vercel.app
