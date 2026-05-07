@@ -83,6 +83,11 @@ export async function POST(request: NextRequest) {
   if (!host || !user || !pass) {
     return NextResponse.json({ error: "POP3 설정이 필요합니다 (host, user, pass)" }, { status: 400 });
   }
+  if (host.includes("@")) {
+    return NextResponse.json({
+      error: `호스트 입력 오류: "${host}"는 이메일 주소입니다.\n호스트 칸에는 서버 주소를 입력하세요 (예: pop.semigate.com, mail.semigate.com)`,
+    }, { status: 400 });
+  }
 
   let session: Pop3Session | null = null;
   try {
