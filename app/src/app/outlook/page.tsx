@@ -2149,7 +2149,21 @@ export default function OutlookPage() {
           {/* Folder pane */}
           <aside className={`${mobileView === "folders" ? "flex" : "hidden"} md:flex w-full md:w-[220px] shrink-0 flex-col bg-[#f3f6fb] border-r border-ink-200`}>
             <div className="px-3 py-3">
-              <button className="flex w-full items-center gap-2 rounded border border-[#0078d4] bg-white px-3 py-2 text-[13px] font-medium text-[#0078d4] hover:bg-[#deecf9] whitespace-nowrap">
+              <button
+                onClick={() => {
+                  const ua = navigator.userAgent;
+                  const isAndroid = /Android/i.test(ua);
+                  const isIOS = /iPhone|iPad|iPod/i.test(ua);
+                  if (isAndroid || isIOS) {
+                    const deepLink = "ms-outlook://compose";
+                    const storeUrl = isIOS
+                      ? "https://apps.apple.com/app/microsoft-outlook/id951937596"
+                      : "https://play.google.com/store/apps/details?id=com.microsoft.office.outlook";
+                    window.location.href = deepLink;
+                    setTimeout(() => { window.location.href = storeUrl; }, 2000);
+                  }
+                }}
+                className="flex w-full items-center gap-2 rounded border border-[#0078d4] bg-white px-3 py-2 text-[13px] font-medium text-[#0078d4] hover:bg-[#deecf9] whitespace-nowrap">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                   <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>

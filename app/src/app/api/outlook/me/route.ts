@@ -37,6 +37,9 @@ Out-B64 @{ name = $name; email = $email }
 let cached: { name: string; email: string } | null = null;
 
 export async function GET() {
+  if (process.platform !== "win32") {
+    return NextResponse.json({ error: "Outlook 연동은 Windows 환경에서만 사용 가능합니다" }, { status: 503 });
+  }
   if (cached) return NextResponse.json(cached);
   try {
     const data = await runPsAsync(SCRIPT, 15000) as { name?: string; email?: string; error?: string };

@@ -167,6 +167,9 @@ async function fetchFolder(folderKey: string, folderNum: number) {
 }
 
 export async function GET(request: NextRequest) {
+  if (process.platform !== "win32") {
+    return NextResponse.json({ error: "Outlook 연동은 Windows 환경에서만 사용 가능합니다" }, { status: 503 });
+  }
   const { searchParams } = new URL(request.url);
   const folderKey = searchParams.get("folder") ?? "inbox";
   const folderNum = FOLDER_MAP[folderKey] ?? 6;

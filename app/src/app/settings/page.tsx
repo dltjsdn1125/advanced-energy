@@ -17,6 +17,12 @@ interface Config {
   smtpHost: string;
   smtpPort: string;
   smtpSsl: boolean;
+  popHost: string;
+  popPort: string;
+  popSsl: boolean;
+  popUser: string;
+  popPass: string;
+  popLeaveOnServer: boolean;
 }
 
 interface ApiSettings {
@@ -33,6 +39,12 @@ interface ApiSettings {
   smtp_host: string;
   smtp_port: string;
   smtp_ssl: boolean;
+  pop_host: string;
+  pop_port: string;
+  pop_ssl: boolean;
+  pop_user: string;
+  pop_pass: string;
+  pop_leave_on_server: boolean;
 }
 
 const DEFAULTS: Config = {
@@ -49,6 +61,12 @@ const DEFAULTS: Config = {
   smtpHost: "",
   smtpPort: "587",
   smtpSsl: true,
+  popHost: "",
+  popPort: "995",
+  popSsl: true,
+  popUser: "",
+  popPass: "",
+  popLeaveOnServer: true,
 };
 
 const LS_KEY = "ae_settings_v1";
@@ -68,6 +86,12 @@ function toApi(c: Config): ApiSettings {
     smtp_host: c.smtpHost,
     smtp_port: c.smtpPort,
     smtp_ssl: c.smtpSsl,
+    pop_host: c.popHost,
+    pop_port: c.popPort,
+    pop_ssl: c.popSsl,
+    pop_user: c.popUser,
+    pop_pass: c.popPass,
+    pop_leave_on_server: c.popLeaveOnServer,
   };
 }
 
@@ -86,6 +110,12 @@ function fromApi(a: ApiSettings): Config {
     smtpHost: a.smtp_host ?? "",
     smtpPort: a.smtp_port ?? "587",
     smtpSsl: a.smtp_ssl ?? true,
+    popHost: a.pop_host ?? "",
+    popPort: a.pop_port ?? "995",
+    popSsl: a.pop_ssl ?? true,
+    popUser: a.pop_user ?? "",
+    popPass: a.pop_pass ?? "",
+    popLeaveOnServer: a.pop_leave_on_server ?? true,
   };
 }
 
@@ -106,6 +136,8 @@ function saveLocal(cfg: Config) {
   localStorage.setItem("ae_daily_start", cfg.dailyStartTime);
   localStorage.setItem("ae_daily_end", cfg.dailyEndTime);
 }
+
+// ── Shared sub-components defined OUTSIDE parent to prevent remount on re-render ──
 
 function Field({
   label, value, onChange, type = "text", placeholder = "", hint = "",
@@ -136,6 +168,15 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`}/>
       </button>
       <span className="text-[12px] text-ink-700">{label}</span>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-ink-200 bg-white p-5 shadow-sm space-y-4">
+      <h2 className="text-[14px] font-bold text-ink-900 border-b border-ink-100 pb-2">{title}</h2>
+      {children}
     </div>
   );
 }
@@ -216,13 +257,6 @@ export default function SettingsPage() {
       setTestStatus(s => ({ ...s, openai: "✗ " + String(e) }));
     }
   }
-
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="rounded-xl border border-ink-200 bg-white p-5 shadow-sm space-y-4">
-      <h2 className="text-[14px] font-bold text-ink-900 border-b border-ink-100 pb-2">{title}</h2>
-      {children}
-    </div>
-  );
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#f5f6f8] px-4 py-6">
@@ -356,6 +390,21 @@ export default function SettingsPage() {
           <Toggle label="SSL/TLS 사용" checked={cfg.imapSsl} onChange={v => set("imapSsl", v)}/>
           <Field label="이메일" value={cfg.imapUser} onChange={v => set("imapUser", v)} placeholder="you@example.com"/>
           <Field label="비밀번호 / 앱 비밀번호" value={cfg.imapPass} onChange={v => set("imapPass", v)} type="password" hint="Gmail: 앱 비밀번호 사용 권장"/>
+        </Section>
+
+        {/* POP3 */}
+        <Section title="POP3 — 받기 (레거시)">
+          <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-[12px] text-amber-800">
+            POP3는 메일을 서버에서 다운로드합니다. IMAP을 지원하지 않는 서버에 사용하세요.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="POP3 Host" value={cfg.popHost} onChange={v => set("popHost", v)} placeholder="pop.gmail.com"/>
+            <Field label="Port" value={cfg.popPort} onChange={v => set("popPort", v)} placeholder="995"/>
+          </div>
+          <Toggle label="SSL/TLS 사용" checked={cfg.popSsl} onChange={v => set("popSsl", v)}/>
+          <Field label="이메일" value={cfg.popUser} onChange={v => set("popUser", v)} placeholder="you@example.com"/>
+          <Field label="비밀번호 / 앱 비밀번호" value={cfg.popPass} onChange={v => set("popPass", v)} type="password" hint="Gmail: 앱 비밀번호 사용 권장"/>
+          <Toggle label="서버에 메일 보관 (받은 후 삭제 안 함)" checked={cfg.popLeaveOnServer} onChange={v => set("popLeaveOnServer", v)}/>
         </Section>
 
         {/* SMTP */}
