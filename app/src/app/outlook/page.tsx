@@ -272,7 +272,42 @@ function RecipientModal({ pool: initPool, onConfirm, onClose }: {
   );
 }
 
-// ── POP3 fallback: returns null if no POP3 settings, throws on connection error ─
+// ── Mail API call helper ──────────────────────────────────────────────────────
+async function callMailApi(
+  endpoint: string,
+  payload: Record<string, unknown>,
+  label: string,
+): Promise<OutlookMessage[]> {
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  let data: unknown;
+  try { data = await res.json(); } catch { throw new Error(`${label}: 서버 응답 파싱 실패 (HTTP ${res.status})`); }
+  if (!res.ok || (data as { error?: string })?.error) {
+    const msg = String((data as { error?: string })?.error ?? `HTTP ${res.status}`)
+      .replace(/^Error:\s*/gi, "").trim();
+    throw new Error(`${label}: ${msg}`);
+  }
+  return Array.isArray(data) ? data as OutlookMessage[] : [];
+}
+
+// ── IMAP fallback: returns null if no IMAP settings ──────────────────────────
+async function tryImapFetch(limit: number): Promise<OutlookMessage[] | null> {
+  const raw = localStorage.getItem("ae_settings_v1");
+  if (!raw) return null;
+  const cfg  = JSON.parse(raw) as Record<string, unknown>;
+  const host = String(cfg.imapHost ?? "");
+  const port = Number(cfg.imapPort) || 993;
+  const ssl  = cfg.imapSsl !== false && cfg.imapSsl !== "false";
+  const user = String(cfg.imapUser ?? "");
+  const pass = String(cfg.imapPass ?? "");
+  if (!host || !user || !pass) return null;
+  return callMailApi("/api/imap/messages", { host, port, ssl, user, pass, limit }, "IMAP");
+}
+
+// ── POP3 fallback: returns null if no POP3 settings ──────────────────────────
 async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
   const raw = localStorage.getItem("ae_settings_v1");
   if (!raw) return null;
@@ -282,20 +317,8 @@ async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
   const ssl  = cfg.popSsl !== false && cfg.popSsl !== "false";
   const user = String(cfg.popUser ?? "");
   const pass = String(cfg.popPass ?? "");
-  if (!host || !user || !pass) return null; // POP3 미설정 → 조용히 건너뜀
-
-  const res  = await fetch("/api/pop3/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ host, port, ssl, user, pass, limit }),
-  });
-  const data = await res.json() as { error?: string } | OutlookMessage[];
-  if (!res.ok || (data as { error?: string })?.error) {
-    const raw = String((data as { error?: string })?.error ?? `HTTP ${res.status}`)
-      .replace(/^Error:\s*/gi, "").trim();
-    throw new Error(`POP3 연결 실패: ${raw}\n설정 → POP3 항목에서 서버 주소와 계정 정보를 확인하세요.`);
-  }
-  return Array.isArray(data) ? data as OutlookMessage[] : [];
+  if (!host || !user || !pass) return null;
+  return callMailApi("/api/pop3/messages", { host, port, ssl, user, pass, limit }, "POP3");
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -572,18 +595,42 @@ export default function OutlookPage() {
       const res = await fetch(`/api/outlook/messages?${qs}`);
       let data  = await res.json();
 
-      // ── POP3 fallback (non-Windows / Outlook not running) ─────────────────────
+      // ── Mail fallback: IMAP → POP3 (non-Windows / Outlook not running) ────────
       if (res.status === 503 || data?.error) {
         if (folder === "inbox" || folder === "sent") {
-          const pop3Msgs = await tryPop3Fetch(50);
-          if (pop3Msgs !== null) {
-            data = pop3Msgs;
+          let mailMsgs: OutlookMessage[] | null = null;
+          let connError = "";
+
+          // 1) IMAP
+          const imapResult = await tryImapFetch(50).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+          if ("ok" in imapResult && imapResult.ok !== null) {
+            mailMsgs = imapResult.ok;
+          } else if ("err" in imapResult) {
+            connError = imapResult.err;
+          }
+
+          // 2) POP3 (IMAP이 없거나 실패했을 때)
+          if (mailMsgs === null) {
+            const pop3Result = await tryPop3Fetch(50).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+            if ("ok" in pop3Result && pop3Result.ok !== null) {
+              mailMsgs = pop3Result.ok;
+            } else if ("err" in pop3Result) {
+              connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
+            }
+          }
+
+          if (mailMsgs !== null) {
+            data = mailMsgs;
+          } else if (connError) {
+            throw new Error(`${connError}\n\n설정 → IMAP/POP3 서버 주소와 계정 정보를 확인하세요.`);
           } else {
-            // POP3 설정 없음 → 안내 메시지
-            throw new Error("Outlook을 사용할 수 없습니다.\n설정 → POP3 항목에서 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다.");
+            throw new Error(
+              "Outlook을 사용할 수 없습니다.\n" +
+              "설정 → IMAP 또는 POP3 항목에 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다."
+            );
           }
         } else {
-          // drafts/deleted/junk: POP3 미지원 → 조용히 빈 목록
+          // drafts/deleted/junk: 미지원 → 조용히 빈 목록
           const empty: OutlookMessage[] = [];
           setFolderCache(folder, empty);
           setMessages(empty); setLoadingCount(0);
