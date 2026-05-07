@@ -81,43 +81,46 @@ async function mailnaraLogin(
 function parseMailList(html: string): unknown[] {
   const messages: unknown[] = [];
 
-  // Find all mail-item list elements
-  const itemRe = /id="row_id_(\d+)"([\s\S]*?)(?=<li class="mail-item|<\/ul>|$)/g;
-  let match: RegExpExecArray | null;
+  // Split on each row_id boundary — more robust than lookahead regex
+  const parts = html.split(/(?=id=["']row_id_\d+["'])/);
 
-  while ((match = itemRe.exec(html)) !== null) {
-    const uid = match[1];
-    const block = match[2];
+  for (const part of parts) {
+    const uidMatch = part.match(/id=["']row_id_(\d+)["']/);
+    if (!uidMatch) continue;
+    const uid = uidMatch[1];
+    // Limit block to at most 6000 chars to avoid cross-item bleed
+    const block = part.slice(0, 6000);
 
-    // seen status
-    const seenMatch = block.match(new RegExp(`id="seen_${uid}"[^>]*value="([^"]+)"`));
+    // seen status (double or single quotes)
+    const seenMatch = block.match(new RegExp(`id=["']seen_${uid}["'][^>]*value=["']([^"']+)["']`));
     const isUnread = !seenMatch || seenMatch[1] === "N";
 
     // from email
-    const fromEmailMatch = block.match(new RegExp(`id="from_address_${uid}"[^>]*value="([^"]+)"`));
+    const fromEmailMatch = block.match(new RegExp(`id=["']from_address_${uid}["'][^>]*value=["']([^"']+)["']`));
     const fromEmail = fromEmailMatch ? fromEmailMatch[1] : "";
 
-    // from name — span with title=email in m-from div
-    const fromNameMatch = block.match(/<span title="[^"]*">([^<]+)<\/span>/);
+    // from name — span with title attr in m-from area
+    const fromNameMatch = block.match(/<span[^>]+title=["'][^"']*["'][^>]*>([^<]+)<\/span>/);
     const fromNameRaw = fromNameMatch ? fromNameMatch[1] : "";
     const fromName = decodeHtml(fromNameRaw.replace(/\s*\.\.\.$/, "").trim());
 
-    // subject
-    const subjMatch = block.match(new RegExp(`id='title_list_${uid}'[^>]*>([^<]+)<`));
+    // subject (try double quote, then single quote id variant)
+    const subjMatch =
+      block.match(new RegExp(`id=["']title_list_${uid}["'][^>]*>([^<]+)<`)) ||
+      block.match(/class=["']m-subject[^"']*["'][^>]*>\s*<[^>]+>([^<]+)</) ;
     const subject = subjMatch ? decodeHtml(subjMatch[1]) : "(제목 없음)";
 
-    // date — <div class="m-date opensans">2026.05.07 <span...>21:38</span></div>
-    const dateMatch = block.match(/class="m-date opensans">([\d.]+)\s*<span[^>]*>([\d:]+)<\/span>/);
+    // date — handles "2026.05.07 <span>21:38</span>" and similar patterns
+    const dateMatch = block.match(/class=["']m-date[^"']*["'][^>]*>([\d.]+)\s*<span[^>]*>([\d:]+)<\/span>/);
     let receivedTime = "";
     if (dateMatch) {
-      // "2026.05.07" + "21:38" → ISO string (assume KST +09:00)
       const [, datePart, timePart] = dateMatch;
       const normalized = datePart.replace(/\./g, "-") + "T" + timePart + ":00+09:00";
       receivedTime = new Date(normalized).toISOString();
     }
 
     // attachment icon
-    const hasAttach = block.includes('class="m-file"') && !block.includes('style="display:none"');
+    const hasAttach = /class=["']m-file["']/.test(block) && !/style=["'][^"']*display\s*:\s*none/.test(block);
 
     messages.push({
       entryId: `web-${uid}`,

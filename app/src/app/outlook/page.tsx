@@ -623,7 +623,7 @@ export default function OutlookPage() {
           let connError = "";
 
           // 1) IMAP
-          const imapResult = await tryImapFetch(50).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+          const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
           if ("ok" in imapResult && imapResult.ok !== null) {
             mailMsgs = imapResult.ok;
           } else if ("err" in imapResult) {
@@ -632,7 +632,7 @@ export default function OutlookPage() {
 
           // 2) POP3 (IMAP이 없거나 실패했을 때)
           if (mailMsgs === null) {
-            const pop3Result = await tryPop3Fetch(50).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+            const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
             if ("ok" in pop3Result && pop3Result.ok !== null) {
               mailMsgs = pop3Result.ok;
             } else if ("err" in pop3Result) {
@@ -642,7 +642,7 @@ export default function OutlookPage() {
 
           // 3) Webmail scraper (POP3/IMAP IP 차단 시 HTTPS로 우회)
           if (mailMsgs === null) {
-            const webResult = await tryWebmailFetch(50).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+            const webResult = await tryWebmailFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
             if ("ok" in webResult && webResult.ok !== null) {
               mailMsgs = webResult.ok;
               connError = ""; // webmail succeeded — clear prior protocol errors
@@ -783,13 +783,38 @@ export default function OutlookPage() {
     }
     setThread([]); setThreadLoading(true);
     try {
-      const params = new URLSearchParams({ convId: msg.conversationId, entryId: msg.entryId });
-      const res  = await fetch(`/api/outlook/thread?${params}`);
-      const data = await res.json();
-      if (data?.error) throw new Error(data.error);
-      const msgs = Array.isArray(data) ? data : [];
-      threadCache.current.set(msg.entryId, msgs);
-      setThread(msgs);
+      let fetchedMsgs: unknown[];
+      if (msg.entryId.startsWith("web-")) {
+        // MAILNARA webmail — Outlook COM 없이 HTTPS로 본문 가져오기
+        const uid = msg.entryId.slice(4);
+        const raw = localStorage.getItem("ae_settings_v1");
+        const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+        const res = await fetch("/api/webmail/thread", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            host:        String(cfg.popHost        ?? ""),
+            user:        String(cfg.popUser        ?? ""),
+            pass:        String(cfg.popPass        ?? ""),
+            uid,
+            subject:     msg.subject,
+            senderName:  msg.senderName,
+            senderEmail: msg.senderEmail,
+            sentOn:      msg.receivedTime,
+          }),
+        });
+        const data = await res.json();
+        if (data?.error) throw new Error(data.error);
+        fetchedMsgs = Array.isArray(data) ? data : [];
+      } else {
+        const params = new URLSearchParams({ convId: msg.conversationId, entryId: msg.entryId });
+        const res  = await fetch(`/api/outlook/thread?${params}`);
+        const data = await res.json();
+        if (data?.error) throw new Error(data.error);
+        fetchedMsgs = Array.isArray(data) ? data : [];
+      }
+      threadCache.current.set(msg.entryId, fetchedMsgs);
+      setThread(fetchedMsgs as ThreadMessage[]);
       // Prefetch next two messages in background
       const list = msgCache.current.get(activeFolder) ?? [];
       const idx  = list.findIndex(m => m.entryId === msg.entryId);
