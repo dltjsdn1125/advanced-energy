@@ -2470,8 +2470,6 @@ ${c.meetingDate ? `${esc(c.meetingDate)} 미팅을 통해 확인된 요구 사�
   .no-break { page-break-inside: avoid; }
 
   /* ══ 인쇄: zoom 리셋 + A4 ════════════════════════════════════════ */
-  /* @page margin: 0 → 브라우저 기본 헤더/푸터 (날짜·URL·제목·페이지번호) 영역 제거 */
-  /* 본문 자체 여백은 body padding 으로 대체 */
   @page { size: A4 portrait; margin: 0; }
   @media print {
     html { zoom: 1; }
@@ -2479,6 +2477,17 @@ ${c.meetingDate ? `${esc(c.meetingDate)} 미팅을 통해 확인된 요구 사�
     .page { padding: 0; box-shadow: none; border-radius: 0; max-width: none; margin: 0; }
     .sec-title { font-size: 11.5px; margin: 14px 0 6px; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  /* ══ Mobile: zoom 리셋 + 반응형 레이아웃 ══════════════════════════ */
+  @media screen and (max-width: 700px) {
+    html { zoom: 1 !important; }
+    body { background: #f4f4f5; }
+    .page { padding: 14px 14px; margin: 0; border-radius: 0; box-shadow: none; max-width: 100%; }
+    .cover-meta { flex-direction: column !important; gap: 8px !important; }
+    .cover-meta-sep { display: none !important; }
+    .cover-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+    .cmp-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .cmp-scroll table { min-width: ${Math.max(models.length * 110 + 200, 400)}px; }
   }
   .page { margin: 0 auto; }
   .sec-title { font-weight: 800; color: #0078D4; border-bottom: 2.5px solid #0078D4; padding-bottom: 5px; letter-spacing: 0.02em; }
@@ -2501,16 +2510,16 @@ ${c.meetingDate ? `${esc(c.meetingDate)} 미팅을 통해 확인된 요구 사�
   <!-- Blue accent bar -->
   <div style="width:5px;background:#0078D4;border-radius:3px 0 0 3px;margin-right:16px;flex-shrink:0;"></div>
   <div style="flex:1;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <img src="${origin}/logo.png" alt="Advanced Energy" style="height:38px;object-fit:contain;" crossorigin="anonymous"/>
+    <div class="cover-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <img src="${origin}/logo.png" alt="Advanced Energy" style="height:34px;object-fit:contain;" crossorigin="anonymous"/>
       <div style="text-align:right;">
-        <div style="font-size:20px;font-weight:900;color:#0078D4;letter-spacing:0.04em;line-height:1.1;">SMPS 전원 공급 장치</div>
-        <div style="font-size:20px;font-weight:900;color:#1a1a1a;letter-spacing:0.02em;line-height:1.1;">제품 제안서</div>
+        <div style="font-size:18px;font-weight:900;color:#0078D4;letter-spacing:0.04em;line-height:1.1;">SMPS 전원 공급 장치</div>
+        <div style="font-size:18px;font-weight:900;color:#1a1a1a;letter-spacing:0.02em;line-height:1.1;">제품 제안서</div>
         <div style="font-size:9px;color:#94a3b8;margin-top:4px;letter-spacing:0.08em;">PRODUCT PROPOSAL · ADVANCED ENERGY INDUSTRIES</div>
       </div>
     </div>
     <!-- Meta bar -->
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:10px 14px;display:flex;gap:24px;">
+    <div class="cover-meta" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:10px 14px;display:flex;gap:24px;">
       <div style="flex:1;">
         <table style="border:none;width:auto;">
           <tr><td style="padding:2px 10px 2px 0;font-weight:700;font-size:9px;color:#64748b;white-space:nowrap;border:none;">수&nbsp;&nbsp;&nbsp;&nbsp;신</td><td style="padding:2px 0;font-size:9.5px;border:none;"><strong>${esc(c.company || "—")}</strong> ${esc(c.contactName ? c.contactName + " 담당자님" : "담당자님")}</td></tr>
@@ -2519,7 +2528,7 @@ ${c.meetingDate ? `${esc(c.meetingDate)} 미팅을 통해 확인된 요구 사�
           <tr><td style="padding:2px 10px 2px 0;font-weight:700;font-size:9px;color:#64748b;border:none;">참&nbsp;&nbsp;&nbsp;&nbsp;조</td><td style="padding:2px 0;font-size:9.5px;border:none;">${esc(c.contactEmail || "—")}</td></tr>
         </table>
       </div>
-      <div style="border-left:1px solid #e2e8f0;"></div>
+      <div class="cover-meta-sep" style="border-left:1px solid #e2e8f0;"></div>
       <div>
         <table style="border:none;width:auto;">
           <tr><td style="padding:2px 10px 2px 0;font-weight:700;font-size:9px;color:#64748b;white-space:nowrap;border:none;">문서번호</td><td style="padding:2px 0;font-size:9.5px;border:none;"><strong>${esc(propNo)}</strong></td></tr>
@@ -2619,8 +2628,8 @@ ${c.meetingDate ? `${esc(c.meetingDate)} 미팅을 통해 확인된 요구 사�
 <!-- SECTION 4: 제안 제품 사양 비교표                               -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <div class="sec-title">4. 제안 제품 사양 비교표 <span>Product Comparison</span></div>
-<div class="no-break">
-  <table style="table-layout:fixed;width:100%;">
+<div class="no-break cmp-scroll">
+  <table style="table-layout:fixed;width:100%;min-width:${Math.max(models.length * 110 + 200, 400)}px;">
     <colgroup>
       <col style="width:8%;"/>
       <col style="width:14%;"/>
@@ -3950,22 +3959,22 @@ Web   : www.advancedenergy.com
 
           {/* ── Step 2: 비교표 ───────────────────────────────────────── */}
           {proposalStep === 2 && (
-            <div className="flex-1 overflow-y-auto bg-[#e8e8ea] p-6">
-              <div className="mx-auto w-full max-w-[1400px] rounded-md bg-white px-4 py-5 shadow-[0_2px_16px_rgba(0,0,0,0.12)] sm:px-8 md:px-14 md:py-8">
-                <h2 className="mono mb-1 text-[22px] font-bold text-black">제품 사양 비교표</h2>
-                <p className="mono mb-6 text-[15px] text-zinc-500">선택된 {proposalModels.length}개 제품의 주요 사양을 비교합니다.</p>
+            <div className="flex-1 overflow-y-auto bg-[#e8e8ea] p-2 sm:p-6">
+              <div className="mx-auto w-full max-w-[1400px] rounded-md bg-white px-3 py-4 shadow-[0_2px_16px_rgba(0,0,0,0.12)] sm:px-8 md:px-14 md:py-8">
+                <h2 className="mono mb-1 text-[18px] font-bold text-black sm:text-[22px]">제품 사양 비교표</h2>
+                <p className="mono mb-4 text-[13px] text-zinc-500 sm:mb-6 sm:text-[15px]">선택된 {proposalModels.length}개 제품의 주요 사양을 비교합니다.</p>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse" style={{ minWidth: `${proposalModels.length * 220 + 220}px` }}>
+                  <table className="w-full border-collapse" style={{ minWidth: `${proposalModels.length * 140 + 160}px` }}>
                     <colgroup>
-                      <col style={{ width: "200px" }} />
+                      <col style={{ width: "140px" }} />
                       {proposalModels.map((_, i) => <col key={i} />)}
                     </colgroup>
                     <thead>
                       <tr>
-                        <th className="border border-zinc-200 bg-zinc-100 px-4 py-3 text-left text-[15px] font-semibold text-zinc-500">비교 항목</th>
+                        <th className="border border-zinc-200 bg-zinc-100 px-2 py-2 text-left text-[12px] font-semibold text-zinc-500 sm:px-4 sm:py-3 sm:text-[15px]">비교 항목</th>
                         {proposalModels.map((m) => (
-                          <th key={m.modelKey} className="border border-zinc-200 px-4 py-3 text-center text-[15px] font-bold"
+                          <th key={m.modelKey} className="border border-zinc-200 px-2 py-2 text-center text-[12px] font-bold sm:px-4 sm:py-3 sm:text-[15px]"
                             style={{ background: "#0078D4", color: "#fff" }}>
                             {m.model}
                           </th>
@@ -3984,18 +3993,18 @@ Web   : www.advancedenergy.com
                         { label: "카탈로그 페이지", fn: (m: Model) => m.pages.slice(0, 4).join(", ") || "—" },
                       ].map((row, ri) => (
                         <tr key={row.label} className={ri % 2 === 0 ? "bg-white" : "bg-zinc-50"}>
-                          <td className="border border-zinc-200 px-4 py-3 text-[14px] font-semibold text-zinc-500">{row.label}</td>
+                          <td className="border border-zinc-200 px-2 py-2 text-[11px] font-semibold text-zinc-500 sm:px-4 sm:py-3 sm:text-[14px]">{row.label}</td>
                           {proposalModels.map((m) => (
-                            <td key={m.modelKey} className="border border-zinc-200 px-4 py-3 text-center text-[14px] text-black">
+                            <td key={m.modelKey} className="border border-zinc-200 px-2 py-2 text-center text-[11px] text-black sm:px-4 sm:py-3 sm:text-[14px]">
                               {row.fn(m)}
                             </td>
                           ))}
                         </tr>
                       ))}
                       <tr className="bg-white">
-                        <td className="border border-zinc-200 px-4 py-3 text-[14px] font-semibold text-zinc-500">주요 특징</td>
+                        <td className="border border-zinc-200 px-2 py-2 text-[11px] font-semibold text-zinc-500 sm:px-4 sm:py-3 sm:text-[14px]">주요 특징</td>
                         {proposalModels.map((m) => (
-                          <td key={m.modelKey} className="border border-zinc-200 px-4 py-3 text-[13px] leading-relaxed">
+                          <td key={m.modelKey} className="border border-zinc-200 px-2 py-2 text-[10px] leading-relaxed sm:px-4 sm:py-3 sm:text-[13px]">
                             {m.contextLines.slice(0, 4).map((l, li) => <div key={li} className="text-zinc-600">· {l}</div>)}
                           </td>
                         ))}
