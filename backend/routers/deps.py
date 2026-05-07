@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase._async.client import AsyncClient, create_client as async_create_client
 from config import get_settings
+import httpx
 
 security = HTTPBearer()
 
@@ -18,23 +19,33 @@ async def get_supabase() -> AsyncClient:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncClient = Depends(get_supabase),
 ) -> dict:
+    cfg = get_settings()
     try:
-        # Supabase validates the JWT on their end — no local secret needed
-        resp = await db.auth.get_user(credentials.credentials)
-        user = resp.user
-        if not user:
+        # Call Supabase Auth REST API directly — Supabase validates the JWT itself
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{cfg.supabase_url}/auth/v1/user",
+                headers={
+                    "Authorization": f"Bearer {credentials.credentials}",
+                    "apikey": cfg.supabase_anon_key,
+                },
+            )
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+            )
+        user_data = resp.json()
+        user_id: str | None = user_data.get("id")
+        if not user_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        is_admin = bool((user.user_metadata or {}).get("is_admin", False))
-        return {"user_id": user.id, "email": user.email, "is_admin": is_admin}
+        is_admin = bool((user_data.get("user_metadata") or {}).get("is_admin", False))
+        return {"user_id": user_id, "email": user_data.get("email"), "is_admin": is_admin}
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
 
 async def get_admin_user(user: dict = Depends(get_current_user)) -> dict:
