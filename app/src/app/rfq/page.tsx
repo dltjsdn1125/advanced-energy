@@ -294,7 +294,7 @@ function Chips({ options, selected, onChange }: { options: string[]; selected: s
 function FT({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cx("overflow-x-auto", className)}>
-      <table className="w-full min-w-[520px] border-collapse bg-white text-left">
+      <table className="rfq-form-table w-full min-w-[520px] border-collapse bg-white text-left">
         <thead>
           <tr>
             <th colSpan={4}
@@ -1355,6 +1355,7 @@ export default function RfqPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [navOpen, setNavOpen] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   // 이메일 템플릿
   const [emailTemplate, setEmailTemplate] = useState(DEFAULT_EMAIL_TEMPLATE);
   const [emailSubject, setEmailSubject] = useState(DEFAULT_EMAIL_SUBJECT);
@@ -2898,6 +2899,18 @@ Web   : www.advancedenergy.com
             color: transparent !important;
           }
         }
+        /* ── Mobile responsive form tables ─────────────────────────── */
+        @media (max-width: 639px) {
+          table.rfq-form-table { display: block !important; min-width: 0 !important; width: 100% !important; }
+          table.rfq-form-table thead, table.rfq-form-table tbody { display: block; }
+          table.rfq-form-table thead tr { display: block; }
+          table.rfq-form-table thead th { display: block !important; padding: 6px 12px !important; }
+          table.rfq-form-table tbody tr { display: grid !important; grid-template-columns: 86px 1fr; border-bottom: 1px solid #e4e4e7; }
+          table.rfq-form-table tbody td { display: block !important; border: none !important; padding: 5px 10px !important; word-break: break-word; min-width: 0; }
+          table.rfq-form-table tbody td:nth-child(3),
+          table.rfq-form-table tbody td:nth-child(4) { border-top: 1px solid #f0f0f0 !important; }
+          table.rfq-form-table tbody td.rfq-full-cell { grid-column: 1 / -1 !important; border-top: none !important; }
+        }
       `}</style>
       <div className="flex h-[100dvh] flex-col bg-zinc-50">
 
@@ -2934,8 +2947,19 @@ Web   : www.advancedenergy.com
         {/* ── Body: sidebar + main ─────────────────────────────────────── */}
         <div className="flex flex-1 min-h-0">
 
-          {/* ── RFQ 저장 목록 사이드바 (데스크탑 고정) ────────────────────────── */}
-          <aside className="hidden w-[196px] shrink-0 flex-col border-r border-zinc-200 bg-white lg:flex overflow-y-auto">
+          {/* ── 모바일 사이드바 오버레이 ──────────────────────────────────────── */}
+          {showMobileSidebar && (
+            <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setShowMobileSidebar(false)}>
+              <div className="absolute inset-0 bg-black/40" />
+            </div>
+          )}
+
+          {/* ── RFQ 저장 목록 사이드바 ─────────────────────────────────────────── */}
+          <aside className={`
+            fixed bottom-0 left-0 top-14 z-50 flex w-[220px] shrink-0 flex-col border-r border-zinc-200 bg-white shadow-xl transition-transform duration-200
+            ${showMobileSidebar ? "translate-x-0" : "-translate-x-full"}
+            lg:static lg:top-auto lg:z-auto lg:flex lg:w-[196px] lg:translate-x-0 lg:shadow-none
+          `}>
             {/* 헤더 */}
             <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2.5">
               <div className="flex items-center gap-1.5">
@@ -2995,11 +3019,18 @@ Web   : www.advancedenergy.com
 
           {/* ── Action bar ───────────────────────────────────────────────── */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex-1">
-              <h1 className="mono text-[18px] font-bold text-black md:text-[22px]">SMPS 사양 요청서</h1>
-              {activeRecord && (
-                <p className="mono mt-0.5 text-[12px] text-black">{docNo} · Rev.{activeRecord.revisions.length - 1}</p>
-              )}
+            <div className="flex flex-1 items-center gap-2">
+              <button type="button" onClick={() => setShowMobileSidebar(o => !o)}
+                className="mono flex items-center gap-1 rounded-pill border border-zinc-300 bg-white px-2.5 py-1.5 text-[11px] text-black hover:bg-zinc-50 lg:hidden">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="shrink-0"><rect x="3" y="5" width="18" height="2" rx="1" fill="currentColor"/><rect x="3" y="11" width="12" height="2" rx="1" fill="currentColor"/><rect x="3" y="17" width="15" height="2" rx="1" fill="currentColor"/></svg>
+                목록{records.length > 0 ? ` (${records.length})` : ""}
+              </button>
+              <div>
+                <h1 className="mono text-[18px] font-bold text-black md:text-[22px]">SMPS 사양 요청서</h1>
+                {activeRecord && (
+                  <p className="mono mt-0.5 text-[12px] text-black">{docNo} · Rev.{activeRecord.revisions.length - 1}</p>
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={openProposal}
@@ -3034,21 +3065,21 @@ Web   : www.advancedenergy.com
 
           {/* ══ 문서 헤더 (배너 + 정보) ══════════════════════════════════ */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] border-collapse bg-white">
+            <table className="rfq-form-table w-full min-w-[520px] border-collapse bg-white">
               <thead>
                 <tr>
-                  <th colSpan={4} className="border-b border-zinc-300 bg-white px-4 py-3">
-                    <div className="flex items-center gap-4">
-                      <Image src="/logo.png" alt="Advanced Energy" width={160} height={42} className="h-9 w-auto shrink-0 object-contain" priority />
-                      <span className="mono flex-1 whitespace-nowrap text-center text-[22px] font-black tracking-[0.06em] text-black">
+                  <th colSpan={4} className="rfq-full-cell border-b border-zinc-300 bg-white px-4 py-3">
+                    <div className="flex items-center gap-2 sm:gap-4">
+                      <Image src="/logo.png" alt="Advanced Energy" width={160} height={42} className="h-7 w-auto shrink-0 object-contain sm:h-9" priority />
+                      <span className="mono flex-1 text-center text-[14px] font-black tracking-[0.04em] text-black sm:whitespace-nowrap sm:text-[22px] sm:tracking-[0.06em]">
                         SMPS Product Specification Request
                       </span>
-                      <Image src="/Semigate.png" alt="Semigate" width={160} height={42} className="h-9 w-auto shrink-0 object-contain" />
+                      <Image src="/Semigate.png" alt="Semigate" width={160} height={42} className="h-7 w-auto shrink-0 object-contain sm:h-9" />
                     </div>
                   </th>
                 </tr>
                 <tr>
-                  <th colSpan={4} className="mono border-b border-zinc-300 bg-zinc-50 py-1 text-center text-[10px] font-normal tracking-widest text-black">
+                  <th colSpan={4} className="rfq-full-cell mono border-b border-zinc-300 bg-zinc-50 py-1 text-center text-[10px] font-normal tracking-widest text-black">
                     Advanced Energy Industries — Sales Engineering
                   </th>
                 </tr>
@@ -3176,7 +3207,7 @@ Web   : www.advancedenergy.com
               </tr>
             ))}
             <tr>
-              <td colSpan={4} className="border-b border-zinc-300 px-3 py-2">
+              <td colSpan={4} className="rfq-full-cell border-b border-zinc-300 px-3 py-2">
                 <button type="button" onClick={addCh} className="mono text-[12px] text-black underline underline-offset-2 hover:no-underline">+ 출력 채널 추가</button>
               </td>
             </tr>
@@ -3208,7 +3239,7 @@ Web   : www.advancedenergy.com
 
           {/* ══ 미팅 메모 / 자유 기록 ══════════════════════════════════════ */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] border-collapse bg-white text-left">
+            <table className="rfq-form-table w-full min-w-[520px] border-collapse bg-white text-left">
               <thead>
                 <tr>
                   <th className="mono border-b border-zinc-300 bg-zinc-200 px-4 py-2 text-left text-[12px] font-bold uppercase tracking-widest text-black">
@@ -3218,7 +3249,7 @@ Web   : www.advancedenergy.com
               </thead>
               <tbody>
                 <tr>
-                  <td className="p-0">
+                  <td className="rfq-full-cell p-0">
                     <textarea
                       value={customer.meetingMemo}
                       onChange={(e) => setC("meetingMemo", e.target.value)}
@@ -3716,42 +3747,50 @@ Web   : www.advancedenergy.com
         <div className="fixed inset-0 z-50 flex flex-col bg-zinc-100">
 
           {/* ── Top toolbar ─────────────────────────────────────────── */}
-          <div className="flex shrink-0 items-center gap-3 border-b border-zinc-200 bg-white px-5 py-3 shadow-sm">
-            {/* Step indicator */}
-            <div className="flex items-center gap-0">
-              {(["1. 제품 선택", "2. 비교표", "3. 미리보기"] as const).map((label, idx) => {
-                const step = (idx + 1) as 1 | 2 | 3;
-                const active = proposalStep === step;
-                const done = proposalStep > step;
-                return (
-                  <div key={step} className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => { if (step <= proposalStep) setProposalStep(step); }}
-                      className={`mono flex h-7 items-center gap-1.5 rounded-pill px-3 text-[11px] font-semibold transition ${
-                        active ? "bg-[#0078D4] text-white" :
-                        done ? "bg-zinc-200 text-zinc-600 hover:bg-zinc-300" :
-                        "text-zinc-400"
-                      }`}
-                    >
-                      <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${
-                        active ? "bg-white text-[#0078D4]" : done ? "bg-zinc-500 text-white" : "border border-zinc-300 text-zinc-400"
-                      }`}>{done ? <Icon name="check" size={9}/> : step}</span>
-                      {label}
-                    </button>
-                    {idx < 2 && <span className="mx-1 text-[11px] text-zinc-300">›</span>}
-                  </div>
-                );
-              })}
+          <div className="shrink-0 border-b border-zinc-200 bg-white shadow-sm">
+            {/* Row 1: step indicator + close */}
+            <div className="flex items-center gap-2 px-3 py-2 sm:px-5">
+              <div className="flex min-w-0 flex-1 items-center gap-0 overflow-x-auto">
+                {(["1. 제품 선택", "2. 비교표", "3. 미리보기"] as const).map((label, idx) => {
+                  const step = (idx + 1) as 1 | 2 | 3;
+                  const active = proposalStep === step;
+                  const done = proposalStep > step;
+                  return (
+                    <div key={step} className="flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => { if (step <= proposalStep) setProposalStep(step); }}
+                        className={`mono flex h-7 items-center gap-1.5 rounded-pill px-2 text-[11px] font-semibold transition sm:px-3 ${
+                          active ? "bg-[#0078D4] text-white" :
+                          done ? "bg-zinc-200 text-zinc-600 hover:bg-zinc-300" :
+                          "text-zinc-400"
+                        }`}
+                      >
+                        <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] ${
+                          active ? "bg-white text-[#0078D4]" : done ? "bg-zinc-500 text-white" : "border border-zinc-300 text-zinc-400"
+                        }`}>{done ? <Icon name="check" size={9}/> : step}</span>
+                        <span className="hidden sm:inline">{label}</span>
+                        <span className="sm:hidden">{["제품", "비교표", "미리보기"][idx]}</span>
+                      </button>
+                      {idx < 2 && <span className="mx-0.5 shrink-0 text-[11px] text-zinc-300 sm:mx-1">›</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={() => setProposalOpen(false)}
+                className="mono ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-300 text-zinc-400 hover:border-zinc-600 hover:text-black"
+                aria-label="닫기">
+                <Icon name="x" size={14}/>
+              </button>
             </div>
-
-            <div className="ml-auto flex items-center gap-2">
+            {/* Row 2: action buttons */}
+            <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 px-3 pb-2 pt-1.5 sm:px-5">
               {/* Step 1 → 2 */}
               {proposalStep === 1 && (
                 <button type="button"
                   disabled={proposalKeys.length < 2}
                   onClick={() => setProposalStep(2)}
-                  className="mono flex items-center gap-1.5 rounded-pill border border-[#0078D4] bg-[#0078D4] px-4 py-1.5 text-[12px] font-semibold text-white transition hover:bg-[#005a9e] disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="mono flex items-center gap-1.5 rounded-pill border border-[#0078D4] bg-[#0078D4] px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-[#005a9e] disabled:opacity-40 disabled:cursor-not-allowed sm:px-4">
                   비교표 보기 ({proposalKeys.length}/5) <Icon name="arrow-right" size={12}/>
                 </button>
               )}
@@ -3762,7 +3801,6 @@ Web   : www.advancedenergy.com
                     className="mono flex items-center gap-1.5 rounded-pill border border-zinc-300 bg-white px-3 py-1.5 text-[12px] text-black hover:bg-zinc-50">
                     <Icon name="arrow-left" size={11}/> 제품 재선택
                   </button>
-                  {/* 카탈로그 페이지 첨부 토글 */}
                   <label className="mono flex cursor-pointer items-center gap-1.5 rounded-pill border border-zinc-300 bg-white px-3 py-1.5 text-[12px] text-black hover:border-black"
                     title="선택 제품의 카탈로그 원본 페이지를 모두 PNG 무손실로 부록에 추가합니다">
                     <input
@@ -3771,8 +3809,7 @@ Web   : www.advancedenergy.com
                       onChange={(e) => setIncludeCatalogPages(e.target.checked)}
                       className="h-3.5 w-3.5 cursor-pointer accent-[#0078D4]"
                     />
-                    <span>카탈로그 페이지 포함</span>
-                    <span className="text-[10px] text-zinc-500">(원본 무손실 · 전체)</span>
+                    <span>카탈로그 포함</span>
                   </label>
                   <button type="button"
                     disabled={catalogPagesGenerating}
@@ -3789,11 +3826,11 @@ Web   : www.advancedenergy.com
                         setCatalogPagesGenerating(false);
                       }
                     }}
-                    className="mono flex items-center gap-1.5 rounded-pill border border-[#0078D4] bg-[#0078D4] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#005a9e] disabled:opacity-60 disabled:cursor-wait">
+                    className="mono flex items-center gap-1.5 rounded-pill border border-[#0078D4] bg-[#0078D4] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#005a9e] disabled:opacity-60 disabled:cursor-wait sm:px-4">
                     {catalogPagesGenerating ? (
                       <>
                         <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent"/>
-                        카탈로그 렌더링 ({catalogPagesProgress.done}/{catalogPagesProgress.total})
+                        렌더링 ({catalogPagesProgress.done}/{catalogPagesProgress.total})
                       </>
                     ) : (
                       <>
@@ -3812,12 +3849,12 @@ Web   : www.advancedenergy.com
                   </button>
                   <button type="button"
                     onClick={() => proposalIframeRef.current?.contentWindow?.print()}
-                    className="mono rounded-pill border border-zinc-300 bg-white px-4 py-1.5 text-[12px] text-black hover:bg-zinc-50">
-                    인쇄 / PDF 저장
+                    className="mono rounded-pill border border-zinc-300 bg-white px-3 py-1.5 text-[12px] text-black hover:bg-zinc-50 sm:px-4">
+                    인쇄 / PDF
                   </button>
                   <button type="button"
                     onClick={openProposalOutlook}
-                    className="mono flex items-center gap-1.5 rounded-pill border border-[#0078D4] bg-[#0078D4] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#005a9e]">
+                    className="mono flex items-center gap-1.5 rounded-pill border border-[#0078D4] bg-[#0078D4] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[#005a9e] sm:px-4">
                     <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className="shrink-0">
                       <rect width="20" height="20" rx="2" fill="#0078D4"/>
                       <rect x="3" y="5" width="14" height="10" rx="1" fill="white" fillOpacity="0.9"/>
@@ -3830,11 +3867,6 @@ Web   : www.advancedenergy.com
                   )}
                 </>
               )}
-              <button type="button" onClick={() => setProposalOpen(false)}
-                className="mono flex h-8 w-8 items-center justify-center rounded-full border border-zinc-300 text-zinc-400 hover:border-zinc-600 hover:text-black"
-                aria-label="닫기">
-                <Icon name="x" size={14}/>
-              </button>
             </div>
           </div>
 
@@ -3919,7 +3951,7 @@ Web   : www.advancedenergy.com
           {/* ── Step 2: 비교표 ───────────────────────────────────────── */}
           {proposalStep === 2 && (
             <div className="flex-1 overflow-y-auto bg-[#e8e8ea] p-6">
-              <div className="mx-auto w-full max-w-[1400px] rounded-md bg-white px-14 py-8 shadow-[0_2px_16px_rgba(0,0,0,0.12)]">
+              <div className="mx-auto w-full max-w-[1400px] rounded-md bg-white px-4 py-5 shadow-[0_2px_16px_rgba(0,0,0,0.12)] sm:px-8 md:px-14 md:py-8">
                 <h2 className="mono mb-1 text-[22px] font-bold text-black">제품 사양 비교표</h2>
                 <p className="mono mb-6 text-[15px] text-zinc-500">선택된 {proposalModels.length}개 제품의 주요 사양을 비교합니다.</p>
 
@@ -4050,8 +4082,8 @@ Web   : www.advancedenergy.com
           ── 제안서 Outlook 발송 모달 ──────────────────────────────────
           ══════════════════════════════════════════════════════════════ */}
       {proposalOutlookPreview && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.55)" }}>
-          <div className="flex w-full max-w-[1100px] flex-col overflow-hidden rounded-lg shadow-2xl" style={{ maxHeight: "92vh", background: "#ffffff" }}>
+        <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-6" style={{ background: "rgba(0,0,0,0.55)" }}>
+          <div className="flex w-full max-w-[1100px] flex-col overflow-hidden rounded-t-lg shadow-2xl sm:rounded-lg" style={{ maxHeight: "92dvh", background: "#ffffff" }}>
 
             {/* ── Outlook 타이틀 바 ─────────────────────────────────── */}
             <div className="flex shrink-0 items-center gap-2.5 px-4 py-2.5" style={{ background: "#0078d4" }}>
@@ -4197,27 +4229,27 @@ Web   : www.advancedenergy.com
       {pdfPreviewHtml && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "rgba(0,0,0,0.72)" }}>
           {/* 상단 툴바 */}
-          <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-5 py-3">
-            <div className="flex items-center gap-3">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-red-500">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-3 py-2.5 sm:px-5 sm:py-3">
+            <div className="flex items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 text-red-500">
                 <rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" strokeWidth="1.8"/>
                 <path d="M7 7h10M7 11h10M7 15h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
-              <span className="mono text-[14px] font-semibold text-black">PDF 미리보기</span>
-              <span className="mono text-[12px] text-zinc-400">— 서식 100% 보존 (인쇄/저장)</span>
+              <span className="mono text-[13px] font-semibold text-black sm:text-[14px]">PDF 미리보기</span>
+              <span className="mono hidden text-[12px] text-zinc-400 sm:inline">— 서식 100% 보존 (인쇄/저장)</span>
             </div>
-            <div className="flex gap-2">
+            <div className="ml-auto flex gap-2">
               <button
                 type="button"
                 onClick={() => iframeRef.current?.contentWindow?.print()}
-                className="mono rounded-pill border border-black bg-black px-4 py-1.5 text-[12px] font-semibold text-white transition hover:bg-lime hover:text-black"
+                className="mono rounded-pill border border-black bg-black px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-lime hover:text-black sm:px-4"
               >
-                인쇄 / PDF 저장
+                인쇄 / PDF
               </button>
               <button
                 type="button"
                 onClick={() => setPdfPreviewHtml(null)}
-                className="mono rounded-pill border border-zinc-300 bg-white px-4 py-1.5 text-[12px] text-black hover:bg-zinc-50"
+                className="mono rounded-pill border border-zinc-300 bg-white px-3 py-1.5 text-[12px] text-black hover:bg-zinc-50 sm:px-4"
               >
                 닫기
               </button>
