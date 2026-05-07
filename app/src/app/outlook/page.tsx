@@ -286,9 +286,18 @@ async function callMailApi(
   let data: unknown;
   try { data = await res.json(); } catch { throw new Error(`${label}: 서버 응답 파싱 실패 (HTTP ${res.status})`); }
   if (!res.ok || (data as { error?: string })?.error) {
-    const msg = String((data as { error?: string })?.error ?? `HTTP ${res.status}`)
+    const raw = String((data as { error?: string })?.error ?? `HTTP ${res.status}`)
       .replace(/^Error:\s*/gi, "").trim();
-    throw new Error(`${label}: ${msg}`);
+    // IP 차단 에러 감지
+    const isIpBlock = /not allowed ip|ip.*block|connection refused/i.test(raw);
+    const detail = isIpBlock
+      ? `${label} 연결 실패: 메일 서버가 클라우드 IP를 차단했습니다.\n\n` +
+        `semigate.com 등 일부 메일 서버는 외부 IP 접속을 허용하지 않습니다.\n` +
+        `해결 방법: PC에서 직접 실행하세요 →\n` +
+        `  cd app && npm run dev\n` +
+        `  브라우저에서 http://localhost:4300 접속`
+      : `${label}: ${raw}`;
+    throw new Error(detail);
   }
   return Array.isArray(data) ? data as OutlookMessage[] : [];
 }
@@ -319,6 +328,18 @@ async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
   const pass = String(cfg.popPass ?? "");
   if (!host || !user || !pass) return null;
   return callMailApi("/api/pop3/messages", { host, port, ssl, user, pass, limit }, "POP3");
+}
+
+// ── Webmail (MAILNARA) fallback: uses POP3 host/user/pass via HTTPS ───────────
+async function tryWebmailFetch(limit: number): Promise<OutlookMessage[] | null> {
+  const raw = localStorage.getItem("ae_settings_v1");
+  if (!raw) return null;
+  const cfg  = JSON.parse(raw) as Record<string, unknown>;
+  const host = String(cfg.popHost ?? "");
+  const user = String(cfg.popUser ?? "");
+  const pass = String(cfg.popPass ?? "");
+  if (!host || !user || !pass) return null;
+  return callMailApi("/api/webmail/messages", { host, user, pass, limit }, "Webmail");
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -616,6 +637,17 @@ export default function OutlookPage() {
               mailMsgs = pop3Result.ok;
             } else if ("err" in pop3Result) {
               connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
+            }
+          }
+
+          // 3) Webmail scraper (POP3/IMAP IP 차단 시 HTTPS로 우회)
+          if (mailMsgs === null) {
+            const webResult = await tryWebmailFetch(50).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+            if ("ok" in webResult && webResult.ok !== null) {
+              mailMsgs = webResult.ok;
+              connError = ""; // webmail succeeded — clear prior protocol errors
+            } else if ("err" in webResult) {
+              connError = connError ? `${connError}\n${webResult.err}` : webResult.err;
             }
           }
 
