@@ -1,0 +1,3063 @@
+"use client";
+
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { apiFetch } from "@/lib/api";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface OutlookMessage {
+  entryId: string; conversationId: string; subject: string;
+  senderName: string; senderEmail: string; receivedTime: string;
+  preview: string; isUnread: boolean; isToMe?: boolean; attachmentCount: number;
+}
+interface RecipAddr { name: string; email: string }
+interface ThreadMessage {
+  entryId: string; subject: string;
+  senderName: string; senderEmail: string; sentOn: string;
+  body: string; htmlBody: string;
+  attachments: { name: string; size: number }[];
+  recipients: { name: string; email: string; rtype: number }[];
+}
+type Tone         = "neutral" | "positive" | "negative" | "custom";
+type Folder       = "inbox" | "toMe" | "sent" | "drafts" | "junk" | "deleted" | "important";
+type ReportPeriod = "daily" | "weekly" | "monthly";
+type Zone   = "pool" | "to" | "cc";
+
+const FOLDER_LABELS: Record<Folder, string> = {
+  toMe: "To Me",
+  inbox: "Inbox", sent: "Sent", drafts: "Drafts",
+  junk: "Junk", deleted: "Deleted", important: "Important",
+};
+const REAL_FOLDERS: Folder[] = ["inbox", "sent", "drafts", "junk", "deleted"];
+const CACHE_KEY        = "ae_outlook_msg_cache_v1";
+const REPORT_CACHE_KEY = "ae_report_cache_v1";
+const PATTERN_CACHE_KEY = "ae_pattern_cache_v1";
+const TASK_CACHE_KEY    = "ae_task_cache_v1";
+const CACHE_TTL_MS     = 60_000;
+
+const REPORT_PERIOD_LABEL: Record<ReportPeriod, string> = {
+  daily: "Daily Report",
+  weekly: "Weekly Report",
+  monthly: "Monthly Report",
+};
+const REPORT_PERIOD_DAYS: Record<ReportPeriod, number> = {
+  daily: 1, weekly: 7, monthly: 30,
+};
+const TONE_LABELS: Record<Tone, string> = {
+  neutral: "Neutral", positive: "Positive", negative: "Negative", custom: "Custom",
+};
+
+// ── Util ──────────────────────────────────────────────────────────────────────
+function formatTime(iso: string) {
+  if (!iso) return "";
+  const d = new Date(iso), mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return "방금"; if (mins < 60) return `${mins}분 전`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}시간 전`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}일 전`;
+  return d.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+}
+function formatDate(iso: string) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("ko-KR", {
+    year: "numeric", month: "long", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+function formatSize(b: number) {
+  if (b < 1024) return `${b}B`;
+  if (b < 1048576) return `${(b / 1024).toFixed(0)}KB`;
+  return `${(b / 1048576).toFixed(1)}MB`;
+}
+function fileIcon(name: string) {
+  const e = name.split(".").pop()?.toLowerCase() ?? "";
+  if (e === "pdf") return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-red-500"><rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M7 12h4a2 2 0 000-4H7v8m0-4h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+  );
+  if (["xlsx","xls","csv"].includes(e)) return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-green-600"><rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M8 8l8 8M16 8l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+  );
+  if (["docx","doc"].includes(e)) return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-blue-600"><rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M7 8h10M7 12h10M7 16h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+  );
+  if (["pptx","ppt"].includes(e)) return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-orange-500"><rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" strokeWidth="1.6"/><rect x="7" y="7" width="10" height="7" rx="1" stroke="currentColor" strokeWidth="1.6"/><path d="M12 14v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+  );
+  if (["png","jpg","jpeg","gif","bmp","webp"].includes(e)) return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-purple-500"><rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.6"/><circle cx="8.5" cy="9.5" r="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M2 16l5-5 4 4 3-3 5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  );
+  if (["zip","rar","7z"].includes(e)) return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-yellow-600"><rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M10 2v4M14 2v4M10 6h4M10 10h4M10 14h4M12 14v6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+  );
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0 text-ink-400"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66L9.41 17.41A2 2 0 016.59 14.59L15.8 5.38" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  );
+}
+function Avatar({ name }: { name?: string }) {
+  const init = (name ?? "").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
+  const col  = ["bg-blue-500","bg-purple-500","bg-green-600","bg-orange-500","bg-rose-500","bg-teal-500"];
+  return (
+    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white ${col[((name ?? "").charCodeAt(0)||0)%col.length]}`}>
+      {init}
+    </div>
+  );
+}
+
+// ── Settings Modal ────────────────────────────────────────────────────────────
+function SettingsModal({ initial, onSave, onClose }: {
+  initial: { openaiKey: string };
+  onSave: (v: { openaiKey: string }) => void;
+  onClose: () => void;
+}) {
+  const [val, setVal] = useState(initial.openaiKey);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-[420px] rounded-xl border border-ink-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
+          <h2 className="text-[15px] font-semibold">설정</h2>
+          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 text-[16px]">×</button>
+        </div>
+        <div className="px-5 py-5 space-y-3">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-[11px] text-blue-800">
+            <p className="font-semibold text-[12px] mb-0.5">로컬 Outlook 2016 연동</p>
+            <p>Outlook이 실행 중이면 별도 로그인 없이 자동으로 연결됩니다.</p>
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-semibold text-ink-700">OpenAI API Key <span className="font-normal text-ink-400">(sk-...)</span></label>
+            <input type="password" value={val} onChange={e => setVal(e.target.value)} placeholder="sk-…"
+              className="w-full rounded border border-ink-200 px-2.5 py-1.5 text-[12px] focus:border-[#0078d4] focus:outline-none"/>
+            <p className="mt-0.5 text-[11px] text-ink-400">키는 브라우저 localStorage에만 저장됩니다.</p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-ink-100 px-5 py-3">
+          <button onClick={onClose} className="rounded border border-ink-200 px-4 py-1.5 text-[13px] text-ink-600 hover:bg-ink-50">취소</button>
+          <button onClick={() => onSave({ openaiKey: val })} className="rounded bg-[#0078d4] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#005fa3]">저장</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Recipient Modal ───────────────────────────────────────────────────────────
+function RecipientModal({ pool: initPool, onConfirm, onClose }: {
+  pool: RecipAddr[];
+  onConfirm: (to: RecipAddr[], cc: RecipAddr[]) => void;
+  onClose: () => void;
+}) {
+  const [pool, setPool]   = useState<RecipAddr[]>(initPool);
+  const [toList, setTo]   = useState<RecipAddr[]>([]);
+  const [ccList, setCc]   = useState<RecipAddr[]>([]);
+  const [dragOver, setDragOver]         = useState<Zone | null>(null);
+  const [selEmails, setSelEmails]       = useState<Set<string>>(new Set());
+  const dragRef = useRef<{ addrs: RecipAddr[]; from: Zone } | null>(null);
+
+  function getList(z: Zone) { return z === "pool" ? pool : z === "to" ? toList : ccList; }
+  function setList(z: Zone, v: RecipAddr[]) {
+    if (z === "pool") setPool(v);
+    else if (z === "to") setTo(v);
+    else setCc(v);
+  }
+
+  function handleClick(addr: RecipAddr, e: React.MouseEvent) {
+    e.stopPropagation();
+    setSelEmails(prev => {
+      const next = new Set(prev);
+      if (e.shiftKey) {
+        if (next.has(addr.email)) next.delete(addr.email);
+        else next.add(addr.email);
+      } else {
+        if (next.has(addr.email) && next.size === 1) next.clear();
+        else { next.clear(); next.add(addr.email); }
+      }
+      return next;
+    });
+  }
+
+  function onDragStart(addr: RecipAddr, from: Zone) {
+    const addrsToMove = selEmails.has(addr.email)
+      ? getList(from).filter(a => selEmails.has(a.email))
+      : [addr];
+    dragRef.current = { addrs: addrsToMove, from };
+  }
+  function onDrop(target: Zone) {
+    if (!dragRef.current) return;
+    const { addrs, from } = dragRef.current;
+    if (from === target) { dragRef.current = null; setDragOver(null); return; }
+    const moving = new Set(addrs.map(a => a.email));
+    setList(from, getList(from).filter(a => !moving.has(a.email)));
+    setList(target, [...getList(target).filter(a => !moving.has(a.email)), ...addrs]);
+    setSelEmails(new Set());
+    dragRef.current = null;
+    setDragOver(null);
+  }
+  function remove(z: Zone, addr: RecipAddr) {
+    setList(z, getList(z).filter(a => a.email !== addr.email));
+    setPool(prev => [...prev.filter(a => a.email !== addr.email), addr]);
+    setSelEmails(prev => { const n = new Set(prev); n.delete(addr.email); return n; });
+  }
+
+  const ZoneBox = ({ zone, label, color }: { zone: Zone; label: string; color: string }) => (
+    <div className="flex min-h-0 flex-col gap-1.5">
+      <div className={`shrink-0 text-[11px] font-semibold uppercase tracking-wide ${color}`}>{label}</div>
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(zone); }}
+        onDragLeave={() => setDragOver(null)}
+        onDrop={() => onDrop(zone)}
+        className={`flex-1 overflow-y-auto rounded-lg border-2 border-dashed p-2 transition-colors ${
+          dragOver === zone ? "border-[#0078d4] bg-[#deecf9]" : "border-ink-200 bg-white"
+        }`}>
+        {getList(zone).map(addr => {
+          const isSel = selEmails.has(addr.email);
+          return (
+            <div key={addr.email} draggable
+              onClick={e => handleClick(addr, e)}
+              onDragStart={() => onDragStart(addr, zone)}
+              className={`mb-1.5 flex cursor-grab items-center gap-1.5 rounded border px-2 py-1 text-[11px] transition active:cursor-grabbing ${
+                isSel
+                  ? "border-[#0f3460] bg-[#dce6f5] font-semibold"
+                  : "border-ink-200 bg-[#f9f9f9] hover:border-[#0078d4] hover:bg-[#deecf9]"
+              }`}>
+              <span className="flex-1 min-w-0">
+                <span className="font-medium truncate block">{addr.name || addr.email}</span>
+                {addr.name && <span className="text-ink-400 truncate block">{addr.email}</span>}
+              </span>
+              {zone !== "pool" && (
+                <button onClick={e => { e.stopPropagation(); remove(zone, addr); }}
+                  className="shrink-0 text-ink-300 hover:text-red-500 text-[14px] leading-none">×</button>
+              )}
+            </div>
+          );
+        })}
+        {getList(zone).length === 0 && (
+          <div className="flex h-full min-h-[80px] items-center justify-center text-[11px] text-ink-300">여기에 드래그</div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="flex w-full max-w-[700px] flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ height: 520, resize: "none" }}>
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-ink-100 px-5 py-3">
+          <h2 className="text-[15px] font-semibold">수신자 선택</h2>
+          <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 text-[16px]">×</button>
+        </div>
+        {/* Hint */}
+        <div className="shrink-0 px-5 pt-3 pb-1">
+          <p className="text-[11px] text-ink-400">
+            주소를 클릭해 선택 · <kbd className="rounded bg-ink-100 px-1 py-0.5 font-mono text-[10px]">Shift</kbd>+클릭으로 다중 선택 후 드래그 이동
+          </p>
+        </div>
+        {/* Zone grid — fills remaining height, each column scrolls independently */}
+        <div className="grid min-h-0 flex-1 grid-cols-3 gap-3 overflow-hidden px-5 pb-2">
+          <ZoneBox zone="pool"  label="스레드 주소"    color="text-ink-500"/>
+          <ZoneBox zone="to"    label="받는 사람 (To)" color="text-[#0078d4]"/>
+          <ZoneBox zone="cc"    label="참조 (CC)"      color="text-purple-600"/>
+        </div>
+        {/* Footer */}
+        <div className="flex shrink-0 items-center justify-between border-t border-ink-100 px-5 py-3">
+          <p className="text-[11px] text-ink-400">받는 사람이 비어있으면 원본 수신자로 발송됩니다</p>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="rounded border border-ink-200 px-4 py-1.5 text-[13px] text-ink-600 hover:bg-ink-50">취소</button>
+            <button onClick={() => onConfirm(toList, ccList)}
+              className="rounded bg-[#0078d4] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#005fa3]">
+              확인
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function OutlookPage() {
+  const [openaiKey,    setOpenaiKey]    = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [messages,      setMessages]      = useState<OutlookMessage[]>([]);
+  const [msgLoading,    setMsgLoading]    = useState(false);
+  const [isRefreshing,  setIsRefreshing]  = useState(false);
+  const [loadingCount,  setLoadingCount]  = useState(0);
+  const [msgError,      setMsgError]      = useState<string | null>(null);
+  const [activeFolder, setActiveFolder] = useState<Folder>("inbox");
+  const [search,       setSearch]       = useState("");
+  const [mobileView,   setMobileView]   = useState<"folders" | "list" | "reading" | "ai">("list");
+
+  const [selected,      setSelected]      = useState<OutlookMessage | null>(null);
+  const [thread,        setThread]        = useState<ThreadMessage[]>([]);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set());
+  const [bulkDeleting,  setBulkDeleting]  = useState(false);
+  const [iframeH,       setIframeH]       = useState<Record<number, number>>({});
+  const [iframeW,       setIframeW]       = useState<Record<number, number>>({});
+
+  // In-memory caches — persist across re-renders, reset on hard reload
+  const msgCache    = useRef<Map<Folder, OutlookMessage[]>>(new Map());
+  const msgCacheTs  = useRef<Map<Folder, number>>(new Map());
+  const threadCache = useRef<Map<string, ThreadMessage[]>>(new Map());
+
+  const persistMsgCache = useCallback(() => {
+    try {
+      const payload: Record<string, { ts: number; data: OutlookMessage[] }> = {};
+      for (const f of REAL_FOLDERS) {
+        const data = msgCache.current.get(f);
+        if (!data) continue;
+        payload[f] = { ts: msgCacheTs.current.get(f) ?? Date.now(), data };
+      }
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    } catch {}
+  }, []);
+
+  const setFolderCache = useCallback((folder: Folder, msgs: OutlookMessage[]) => {
+    msgCache.current.set(folder, msgs);
+    msgCacheTs.current.set(folder, Date.now());
+    persistMsgCache();
+  }, [persistMsgCache]);
+
+  const [aiOpen,       setAiOpen]       = useState(true);
+  const [tone,         setTone]         = useState<Tone>("neutral");
+  const [customNote,   setCustomNote]   = useState("");
+  const [draft,         setDraft]         = useState("");
+  const [draftPreview,  setDraftPreview]  = useState(false);
+  const [draftCopied,   setDraftCopied]   = useState(false);
+  const [tableMode,     setTableMode]     = useState(false);
+  const [draftLoading,  setDraftLoading]  = useState(false);
+  const [draftError,    setDraftError]    = useState<string | null>(null);
+  const [replyStatus,  setReplyStatus]  = useState("");
+  const [replyAction,  setReplyAction]  = useState<"reply" | "replyAll" | "forward">("reply");
+
+  // Inline compose
+  const [composeOpen,    setComposeOpen]    = useState(false);
+  const [composeToStr,   setComposeToStr]   = useState("");
+  const [composeCcStr,   setComposeCcStr]   = useState("");
+  const [composeBody,    setComposeBody]    = useState("");
+  const [composeSending, setComposeSending] = useState(false);
+  const [sendSuccess,    setSendSuccess]    = useState(false);
+  const [sendSuccessOut, setSendSuccessOut] = useState(false);
+
+  // 보내는 사람 (localStorage 고정 가능)
+  const [senderName,   setSenderName]   = useState("");
+  const [senderEmail,  setSenderEmail]  = useState("");
+  const [senderLocked, setSenderLocked] = useState(false);
+  // 메일 목적 (매번 입력)
+  const [purpose,      setPurpose]      = useState("");
+  // 글자 수 제한
+  const [charLimitSel,    setCharLimitSel]    = useState("No Limit");
+  const [charLimitCustom, setCharLimitCustom] = useState("");
+
+  const [transResult,    setTransResult]    = useState("");
+  const [transIsHtml,    setTransIsHtml]    = useState(false);
+  const [transIframeH,   setTransIframeH]   = useState(300);
+  const [transLoading,   setTransLoading]   = useState(false);
+  const [transError,     setTransError]     = useState<string | null>(null);
+  const [transLang,      setTransLang]      = useState("Korean");
+  const [transModalOpen, setTransModalOpen] = useState(false);
+  const [copyDone,       setCopyDone]       = useState(false);
+
+  // Summary
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryText,    setSummaryText]    = useState("");
+  const [summaryError,   setSummaryError]   = useState<string | null>(null);
+  const [summaryOpen,    setSummaryOpen]    = useState(false);
+  const [summaryCopied,  setSummaryCopied]  = useState(false);
+
+  // Recipient modal
+  const [recipOpen,   setRecipOpen]   = useState(false);
+  const [pendingSend, setPendingSend] = useState(false);
+  const [recipPool,   setRecipPool]   = useState<RecipAddr[]>([]);
+  // "ai" mode: modal opens before draft generation to pre-select recipients
+  const [recipMode,   setRecipMode]   = useState<"send" | "ai">("send");
+  const [aiTo,        setAiTo]        = useState<RecipAddr[]>([]);
+  const [aiCc,        setAiCc]        = useState<RecipAddr[]>([]);
+
+  // Important messages — persisted in localStorage
+  const [important, setImportant] = useState<OutlookMessage[]>([]);
+
+  // Report
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportPeriod,    setReportPeriod]    = useState<ReportPeriod>("daily");
+  const [reportText,      setReportText]      = useState("");
+  const [reportLoading,   setReportLoading]   = useState(false);
+  const [reportError,     setReportError]     = useState<string | null>(null);
+  const [reportCopied,    setReportCopied]    = useState(false);
+  const [reportSaving,    setReportSaving]    = useState(false);
+  const [reportSaved,     setReportSaved]     = useState(false);
+  const [reportShareUrl,  setReportShareUrl]  = useState("");
+  const [telegramSending, setTelegramSending] = useState(false);
+  const [telegramStatus,  setTelegramStatus]  = useState("");
+
+  // Work Pattern Analysis
+  const [patternModalOpen, setPatternModalOpen] = useState(false);
+  const [patternText,      setPatternText]      = useState("");
+  const [patternLoading,   setPatternLoading]   = useState(false);
+  const [patternError,     setPatternError]     = useState<string | null>(null);
+  const [patternCopied,    setPatternCopied]    = useState(false);
+  const [patternTgSending, setPatternTgSending] = useState(false);
+  const [patternTgStatus,  setPatternTgStatus]  = useState("");
+  const [patternDays,      setPatternDays]      = useState<"7"|"30"|"90"|"180"|"365"|"all">("all");
+  const [patternScope,     setPatternScope]     = useState<"all"|"inbox"|"sent">("all");
+
+  // All Task Summary
+  const [taskModalOpen,  setTaskModalOpen]  = useState(false);
+  const [taskText,       setTaskText]       = useState("");
+  const [taskLoading,    setTaskLoading]    = useState(false);
+  const [taskError,      setTaskError]      = useState<string | null>(null);
+  const [taskCopied,     setTaskCopied]     = useState(false);
+  const [taskTgSending,  setTaskTgSending]  = useState(false);
+  const [taskTgStatus,   setTaskTgStatus]   = useState("");
+  const [taskDays,       setTaskDays]       = useState<"7"|"30"|"90"|"180"|"365"|"all">("all");
+  const [taskScope,      setTaskScope]      = useState<"all"|"inbox"|"sent">("all");
+
+  useEffect(() => {
+    setOpenaiKey(localStorage.getItem("ae_openai_key") ?? "");
+    setSenderName(localStorage.getItem("ae_sender_name") ?? "");
+    setSenderEmail(localStorage.getItem("ae_sender_email") ?? "");
+    setSenderLocked(localStorage.getItem("ae_sender_locked") === "true");
+    try {
+      setImportant(JSON.parse(localStorage.getItem("ae_important") ?? "[]"));
+    } catch {
+      setImportant([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, { ts?: number; data?: OutlookMessage[] }>;
+      for (const f of REAL_FOLDERS) {
+        const row = parsed?.[f];
+        if (!row || !Array.isArray(row.data)) continue;
+        msgCache.current.set(f, row.data);
+        msgCacheTs.current.set(f, row.ts ?? 0);
+      }
+      const inbox = msgCache.current.get("inbox");
+      if (inbox?.length) {
+        setMessages(inbox);
+        setLoadingCount(inbox.length);
+      }
+    } catch {}
+  }, []);
+  function handleSaveSettings(v: { openaiKey: string }) {
+    localStorage.setItem("ae_openai_key", v.openaiKey);
+    setOpenaiKey(v.openaiKey); setSettingsOpen(false);
+  }
+
+  const loadMessages = useCallback(async (folder: Folder = activeFolder, forceRefresh = false) => {
+    setMsgError(null);
+    const selectedEntryId = selected?.entryId ?? "";
+    const preserveSelection = folder === activeFolder && !!selectedEntryId;
+    if (folder === "important" || folder === "toMe") {
+      // Virtual folder — no API call, just use local state
+      if (folder === "toMe") {
+        const inboxCached = msgCache.current.get("inbox") ?? [];
+        setMessages(inboxCached.filter(m => !!m.isToMe));
+      }
+      setSelected(null); setThread([]);
+      return;
+    }
+    const cached = msgCache.current.get(folder);
+
+    // ── Incremental refresh (새로고침 버튼) ─────────────────────────────────────
+    // Fetch the 50 most recent emails, find ones not already in cache, prepend them.
+    // This is reliable: no PS-side date parsing, no timezone issues.
+    if (forceRefresh && cached && cached.length > 0) {
+      try {
+        const qs  = new URLSearchParams({ folder, limit: "200", force: "1" });
+        const res = await fetch(`/api/outlook/messages?${qs}`, { cache: "no-store" });
+        const data = await res.json();
+        if (data?.error) throw new Error(data.error);
+        if (Array.isArray(data) && data.length > 0) {
+          const recentMsgs = data as OutlookMessage[];
+          const existingIds = new Set(cached.map((m: OutlookMessage) => m.entryId.toUpperCase()));
+          const trulyNew = recentMsgs.filter((m: OutlookMessage) => !existingIds.has(m.entryId.toUpperCase()));
+          if (trulyNew.length > 0) {
+            const merged = [...trulyNew, ...cached];
+            setFolderCache(folder, merged);
+            setMessages(merged);
+            setLoadingCount(merged.length);
+            // 현재 선택 유지 — Outlook처럼 새 메일은 목록 상단에만 추가
+          } else {
+            // No new emails — update read/unread state for existing messages
+            const updatedMap = new Map(recentMsgs.map(m => [m.entryId.toUpperCase(), m]));
+            const refreshed = cached.map((m: OutlookMessage) => updatedMap.get(m.entryId.toUpperCase()) ?? m);
+            setFolderCache(folder, refreshed);
+            setMessages(refreshed);
+          }
+        }
+        return;
+      } catch (err) {
+        console.error('[REFRESH] fallback to full refresh:', err);
+      }
+    }
+
+    if (cached && !forceRefresh) {
+      setMessages(cached); setLoadingCount(cached.length);
+      if (preserveSelection) {
+        const matched = cached.find(m => m.entryId === selectedEntryId);
+        if (matched) setSelected(matched);
+        else if (cached.length > 0) selectMessage(cached[0]);
+      } else if (cached.length > 0) {
+        selectMessage(cached[0]);
+      }
+      // Prefetch threads for next visible messages in background
+      cached.slice(1, 6).forEach(m => prefetchThread(m));
+      const age = Date.now() - (msgCacheTs.current.get(folder) ?? 0);
+      if (age < CACHE_TTL_MS) return;
+      // Stale cache: background refresh of 50 most recent, merge new ones
+      fetch(`/api/outlook/messages?${new URLSearchParams({ folder, limit: "50" })}`)
+        .then(r => r.json())
+        .then((data: unknown) => {
+          if (!Array.isArray(data) || data.length === 0) return;
+          const recentMsgs = data as OutlookMessage[];
+          const existing = msgCache.current.get(folder) ?? [];
+          const existingIds = new Set(existing.map(m => m.entryId.toUpperCase()));
+          const trulyNew = recentMsgs.filter(m => !existingIds.has(m.entryId.toUpperCase()));
+          if (trulyNew.length === 0) return;
+          const merged = [...trulyNew, ...existing];
+          setFolderCache(folder, merged);
+          if (activeFolder === folder) {
+            setMessages(merged);
+            setLoadingCount(merged.length);
+            if (preserveSelection) {
+              const matched = merged.find(m => m.entryId === selectedEntryId);
+              if (matched) setSelected(matched);
+            }
+          }
+        })
+        .catch(() => {});
+      return;
+    } else {
+      // forceRefresh=true 인데 캐시가 없는 경우 또는 캐시가 비어있는 경우만 클리어
+      // (증분 fetch 실패 fallthrough 시 기존 목록 유지)
+      if (!cached || cached.length === 0) {
+        setMessages([]); setLoadingCount(0);
+        if (!preserveSelection) {
+          setSelected(null); setThread([]);
+        }
+      }
+    }
+    setMsgLoading(true);
+    try {
+      const qs   = new URLSearchParams({ folder });
+      const res  = await fetch(`/api/outlook/messages?${qs}`);
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      const msgs: OutlookMessage[] = Array.isArray(data) ? data : [];
+      setFolderCache(folder, msgs);
+      setMessages(msgs); setLoadingCount(msgs.length);
+      if (preserveSelection) {
+        const matched = msgs.find(m => m.entryId === selectedEntryId);
+        if (matched) setSelected(matched);
+        else if (msgs.length > 0) selectMessage(msgs[0]);
+      } else if (msgs.length > 0) {
+        selectMessage(msgs[0]);
+      }
+      // Prefetch threads for next visible messages in background
+      msgs.slice(1, 6).forEach(m => prefetchThread(m));
+    } catch (e: unknown) {
+      if (!cached || forceRefresh) setMsgError(String(e));
+    } finally { setMsgLoading(false); }
+  }, [activeFolder, selected, setFolderCache]);
+
+  useEffect(() => {
+    // Auto-detect current Outlook user if not already saved
+    if (!localStorage.getItem("ae_sender_email")) {
+      fetch("/api/outlook/me")
+        .then(r => r.json())
+        .then((d: { name?: string; email?: string }) => {
+          if (d.email) {
+            setSenderEmail(d.email);
+            localStorage.setItem("ae_sender_email", d.email);
+          }
+          if (d.name && !localStorage.getItem("ae_sender_name")) {
+            setSenderName(d.name);
+            localStorage.setItem("ae_sender_name", d.name);
+          }
+        })
+        .catch(() => {});
+    }
+
+    loadMessages("inbox").then(() => {
+      // Prefetch all other folders in parallel (short delay to not block inbox render)
+      setTimeout(() => {
+        for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
+          fetch(`/api/outlook/messages?folder=${f}`)
+            .then(r => r.json())
+            .then(data => { if (Array.isArray(data)) setFolderCache(f, data); })
+            .catch(() => {});
+        }
+      }, 500);
+    });
+  }, []); // eslint-disable-line
+
+  // Keyboard shortcuts: Ctrl+A (select all), Delete (bulk delete)
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+        e.preventDefault();
+        setCheckedIds(new Set(filtered.map(m => m.entryId)));
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        setCheckedIds(prev => {
+          if (prev.size > 0) {
+            bulkDelete(Array.from(prev));
+            return prev;
+          }
+          return prev;
+        });
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }); // eslint-disable-line
+
+  // Background thread prefetch — warms server PS cache, no UI side-effects
+  const prefetchingRef = useRef<Set<string>>(new Set());
+  function prefetchThread(msg: OutlookMessage) {
+    if (threadCache.current.has(msg.entryId)) return;
+    if (prefetchingRef.current.has(msg.entryId)) return;
+    prefetchingRef.current.add(msg.entryId);
+    const params = new URLSearchParams({ convId: msg.conversationId, entryId: msg.entryId });
+    fetch(`/api/outlook/thread?${params}`)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) threadCache.current.set(msg.entryId, data); })
+      .catch(() => {})
+      .finally(() => prefetchingRef.current.delete(msg.entryId));
+  }
+
+  async function selectMessage(msg: OutlookMessage) {
+    setSelected(msg); setDraft(""); setDraftError(null); setReplyStatus(""); setIframeH({}); setIframeW({});
+    setMobileView("reading");
+    setSummaryText(""); setSummaryError(null);
+    setComposeOpen(false); setComposeBody("");
+    if (msg.isUnread) {
+      setMessages(prev => prev.map(m => (m.entryId === msg.entryId ? { ...m, isUnread: false } : m)));
+      setFolderCache(
+        activeFolder,
+        (msgCache.current.get(activeFolder) ?? []).map(m => (m.entryId === msg.entryId ? { ...m, isUnread: false } : m)),
+      );
+      setImportant(prev => prev.map(m => (m.entryId === msg.entryId ? { ...m, isUnread: false } : m)));
+      fetch("/api/outlook/read", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ entryId: msg.entryId }),
+      }).catch(() => {});
+    }
+    const cached = threadCache.current.get(msg.entryId);
+    if (cached) {
+      setThread(cached);
+      // Prefetch neighbours after serving from cache
+      const list = msgCache.current.get(activeFolder) ?? [];
+      const idx  = list.findIndex(m => m.entryId === msg.entryId);
+      [list[idx + 1], list[idx + 2]].filter(Boolean).forEach(m => prefetchThread(m));
+      return;
+    }
+    setThread([]); setThreadLoading(true);
+    try {
+      const params = new URLSearchParams({ convId: msg.conversationId, entryId: msg.entryId });
+      const res  = await fetch(`/api/outlook/thread?${params}`);
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      const msgs = Array.isArray(data) ? data : [];
+      threadCache.current.set(msg.entryId, msgs);
+      setThread(msgs);
+      // Prefetch next two messages in background
+      const list = msgCache.current.get(activeFolder) ?? [];
+      const idx  = list.findIndex(m => m.entryId === msg.entryId);
+      [list[idx + 1], list[idx + 2]].filter(Boolean).forEach(m => prefetchThread(m));
+    } catch (e: unknown) { setMsgError(String(e)); }
+    finally { setThreadLoading(false); }
+  }
+
+  function downloadAtt(entryId: string, name: string) {
+    window.open(`/api/outlook/attachment?${new URLSearchParams({ entryId, name })}`, "_blank");
+  }
+
+  async function translateThread() {
+    if (!thread.length) return;
+    setTransLoading(true); setTransError(null); setTransIframeH(300);
+    // Keep previous result visible until new one arrives (don't flash empty)
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          htmlMessages: thread.map(m => ({
+            senderName: m.senderName,
+            sentOn: m.sentOn,
+            html: m.htmlBody ||
+              `<div style="font-family:'고운돋움',Arial,sans-serif;font-size:11px;line-height:1.7;padding:12px;white-space:pre-wrap">${
+                (m.body || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+              }</div>`,
+          })),
+          targetLang: transLang,
+          apiKey: openaiKey,
+        }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      const result = data.translated ?? "";
+      setTransResult(result);
+      setTransIsHtml(data.isHtml ?? false);
+      if (result) setTransModalOpen(true);
+    } catch (e: unknown) { setTransError((e as Error).message); }
+    finally { setTransLoading(false); }
+  }
+
+  async function generateSummary() {
+    if (!selected) return;
+    // Read thread from cache ref — always contains the latest data regardless of React state timing
+    const currentThread = threadCache.current.get(selected.entryId) ?? thread;
+    if (currentThread.length === 0) return;
+    const entryIdAtStart = selected.entryId;
+    setSummaryLoading(true); setSummaryError(null); setSummaryText("");
+    try {
+      const res = await fetch("/api/ai/summarize", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          thread: currentThread.map(m => ({
+            senderName: m.senderName, senderEmail: m.senderEmail, sentOn: m.sentOn,
+            body: m.body || m.htmlBody.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+          })),
+          convId: selected.conversationId,
+          apiKey: openaiKey,
+        }),
+      });
+      const data = await res.json();
+      // Discard result if user switched to a different email while request was in flight
+      if (selected?.entryId !== entryIdAtStart) return;
+      if (data?.error) throw new Error(data.error);
+      setSummaryText(data.summary ?? "");
+      setSummaryOpen(true);
+    } catch (e: unknown) {
+      if (selected?.entryId === entryIdAtStart) setSummaryError((e as Error).message);
+    }
+    finally { if (selected?.entryId === entryIdAtStart) setSummaryLoading(false); }
+  }
+
+  async function generateDraft(toList: RecipAddr[] = aiTo, ccList: RecipAddr[] = aiCc) {
+    if (!selected || thread.length === 0) return;
+    setDraftLoading(true); setDraftError(null); setDraft("");
+    try {
+      // Fetch Outlook signature in parallel with nothing (fail-soft)
+      const sigData = await fetch("/api/outlook/signature").then(r => r.json()).catch(() => ({}));
+      const signature = (sigData as { signature?: string }).signature ?? "";
+
+      const res = await fetch("/api/ai/reply", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          thread: thread.map(m => ({
+            senderName: m.senderName, senderEmail: m.senderEmail, sentOn: m.sentOn,
+            body: m.body || m.htmlBody.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+            attachments: m.attachments.map(a => ({ name: a.name, size: a.size })),
+          })),
+          tone, customToneNote: tone === "custom" ? customNote : "",
+          senderName, senderEmail, purpose,
+          recipientsTo: toList.map(a => `${a.name} <${a.email}>`),
+          recipientsCc: ccList.map(a => `${a.name} <${a.email}>`),
+          charLimit: charLimitSel === "Custom" ? (charLimitCustom || "") : charLimitSel === "No Limit" ? "" : charLimitSel,
+          apiKey: openaiKey,
+          signature,
+          tableMode,
+          convId: selected.conversationId,
+        }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      // Strip structural markers the AI may echo back
+      const cleaned = (data.draft ?? "")
+        .replace(/---서명시작---\n?/g, "")
+        .replace(/---서명끝---\n?/g, "");
+      setDraft(cleaned);
+    } catch (e: unknown) { setDraftError((e as Error).message); }
+    finally { setDraftLoading(false); }
+  }
+
+  function toggleImportant(msg: OutlookMessage) {
+    setImportant(prev => {
+      const exists = prev.some(m => m.entryId === msg.entryId);
+      const next = exists ? prev.filter(m => m.entryId !== msg.entryId) : [...prev, msg];
+      localStorage.setItem("ae_important", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  // Collect unique addresses from thread for the modal
+  function buildRecipPool(): RecipAddr[] {
+    const seen = new Set<string>();
+    const addrs: RecipAddr[] = [];
+    for (const msg of thread) {
+      const add = (name: string, email: string) => {
+        const key = email.toLowerCase().trim();
+        if (!key || seen.has(key)) return;
+        seen.add(key); addrs.push({ name: name.trim(), email: email.trim() });
+      };
+      add(msg.senderName, msg.senderEmail);
+      for (const r of msg.recipients ?? []) add(r.name, r.email);
+    }
+    return addrs;
+  }
+
+  function openRecipientModal(send: boolean) {
+    setRecipPool(buildRecipPool()); setRecipMode("send");
+    setPendingSend(send); setRecipOpen(true);
+  }
+
+  function openAiRecipModal() {
+    setRecipPool(buildRecipPool()); setRecipMode("ai");
+    setRecipOpen(true);
+  }
+
+  async function handleRecipConfirm(to: RecipAddr[], cc: RecipAddr[]) {
+    setRecipOpen(false);
+    if (recipMode === "ai") {
+      setAiTo(to); setAiCc(cc);
+      await generateDraft(to, cc);
+    } else if ((recipMode as string) === "forward") {
+      // Direct forward — no AI draft needed
+      const toStr = to.map(a => a.email).join("; ");
+      const ccStr = cc.map(a => a.email).join("; ");
+      setReplyStatus("전달 창 여는 중…");
+      try {
+        const res = await fetch("/api/outlook/reply", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ entryId: selected!.entryId, body: "", send: false, to: toStr, cc: ccStr, action: "forward" }),
+        });
+        const data = await res.json();
+        if (data?.error) throw new Error(data.error);
+        setReplyStatus("✓ 전달 창이 열렸습니다.");
+      } catch (e: unknown) { setReplyStatus("오류: " + String(e)); }
+    } else {
+      await executeReply(to, cc, pendingSend);
+    }
+  }
+
+  async function executeReply(to: RecipAddr[], cc: RecipAddr[], send: boolean) {
+    const label = replyAction === "forward" ? "전달" : replyAction === "replyAll" ? "전체 회신" : "회신";
+    setReplyStatus(send ? `${label} 발송 중…` : `${label} 창 여는 중…`);
+    try {
+      const toStr = to.map(a => a.email).join("; ");
+      const ccStr = cc.map(a => a.email).join("; ");
+      const res = await fetch("/api/outlook/reply", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ entryId: selected!.entryId, body: draft, send, to: toStr, cc: ccStr, action: replyAction }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      setReplyStatus(send ? `✓ ${label} 발송 완료!` : `✓ ${label} 창이 열렸습니다.`);
+      setTimeout(() => setReplyStatus(""), 4000);
+    } catch (e: unknown) { setReplyStatus("오류: " + String(e)); }
+  }
+
+  // Open inline compose panel pre-filled based on action
+  function quickOutlookAction(action: "reply" | "replyAll" | "forward") {
+    if (!selected) return;
+    setReplyAction(action);
+    setComposeBody("");
+    setReplyStatus("");
+
+    const latest = thread[thread.length - 1];
+    const me = senderEmail.toLowerCase().trim();
+
+    if (action === "reply") {
+      setComposeToStr(latest?.senderEmail ?? selected.senderEmail ?? "");
+      setComposeCcStr("");
+    } else if (action === "replyAll") {
+      const toAddrs: string[] = [];
+      const latestSender = (latest?.senderEmail ?? selected.senderEmail ?? "").toLowerCase().trim();
+      if (latestSender && latestSender !== me) toAddrs.push(latest?.senderEmail ?? selected.senderEmail ?? "");
+      for (const r of latest?.recipients ?? []) {
+        if (r.rtype === 1 && r.email.toLowerCase().trim() !== me) toAddrs.push(r.email);
+      }
+      const ccAddrs = (latest?.recipients ?? [])
+        .filter(r => r.rtype === 2 && r.email.toLowerCase().trim() !== me)
+        .map(r => r.email);
+      setComposeToStr(toAddrs.join("; "));
+      setComposeCcStr(ccAddrs.join("; "));
+    } else {
+      // forward — empty recipients, user fills in
+      setComposeToStr("");
+      setComposeCcStr("");
+    }
+
+    setComposeOpen(true);
+  }
+
+  async function sendCompose() {
+    if (!selected || composeSending) return;
+    setComposeSending(true);
+    setReplyStatus("발송 중…");
+    try {
+      const res = await fetch("/api/outlook/reply", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          entryId: selected.entryId,
+          body: composeBody,
+          send: true,
+          to: composeToStr,
+          cc: composeCcStr,
+          action: replyAction,
+        }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      setComposeOpen(false);
+      setComposeBody("");
+      setReplyStatus("");
+      setSendSuccessOut(false);
+      setSendSuccess(true);
+      setTimeout(() => setSendSuccessOut(true), 2000);
+      setTimeout(() => setSendSuccess(false), 2500);
+    } catch (e: unknown) {
+      setReplyStatus("오류: " + String(e));
+    } finally {
+      setComposeSending(false);
+    }
+  }
+
+  async function deleteMessage(msg: OutlookMessage) {
+    const ok = window.confirm(
+      activeFolder === "deleted"
+        ? "이 메일을 영구 삭제할까요?"
+        : "이 메일을 삭제할까요? (지운 편지함으로 이동)",
+    );
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/outlook/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ entryId: msg.entryId }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+
+      setMessages(prev => prev.filter(m => m.entryId !== msg.entryId));
+      setFolderCache(
+        activeFolder,
+        (msgCache.current.get(activeFolder) ?? []).filter(m => m.entryId !== msg.entryId),
+      );
+      if (msgCache.current.has("inbox")) {
+        setFolderCache(
+          "inbox",
+          (msgCache.current.get("inbox") ?? []).filter(m => m.entryId !== msg.entryId),
+        );
+      }
+      msgCache.current.delete("deleted");
+      msgCacheTs.current.delete("deleted");
+      persistMsgCache();
+      threadCache.current.delete(msg.entryId);
+      setImportant(prev => {
+        const next = prev.filter(m => m.entryId !== msg.entryId);
+        localStorage.setItem("ae_important", JSON.stringify(next));
+        return next;
+      });
+      if (selected?.entryId === msg.entryId) {
+        setSelected(null);
+        setThread([]);
+        setDraft("");
+      }
+    } catch (e: unknown) {
+      alert(`삭제 실패: ${String(e)}`);
+    }
+  }
+
+  async function bulkDelete(ids: string[]) {
+    if (ids.length === 0) return;
+    const permanent = activeFolder === "deleted";
+    const ok = window.confirm(
+      permanent
+        ? `선택된 메일 ${ids.length}건을 영구 삭제할까요?`
+        : `선택된 메일 ${ids.length}건을 삭제할까요? (지운 편지함으로 이동)`,
+    );
+    if (!ok) return;
+    setBulkDeleting(true);
+    const idSet = new Set(ids);
+    try {
+      await Promise.all(
+        ids.map(entryId =>
+          fetch("/api/outlook/delete", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ entryId }),
+          }),
+        ),
+      );
+      setMessages(prev => prev.filter(m => !idSet.has(m.entryId)));
+      for (const f of ["inbox", "sent", "drafts", "junk", "deleted", activeFolder] as Folder[]) {
+        if (msgCache.current.has(f)) {
+          setFolderCache(f, (msgCache.current.get(f) ?? []).filter(m => !idSet.has(m.entryId)));
+        }
+      }
+      msgCache.current.delete("deleted");
+      msgCacheTs.current.delete("deleted");
+      persistMsgCache();
+      for (const id of ids) threadCache.current.delete(id);
+      setImportant(prev => {
+        const next = prev.filter(m => !idSet.has(m.entryId));
+        localStorage.setItem("ae_important", JSON.stringify(next));
+        return next;
+      });
+      if (selected && idSet.has(selected.entryId)) {
+        setSelected(null); setThread([]); setDraft("");
+      }
+      setCheckedIds(new Set());
+    } catch (e: unknown) {
+      alert(`일괄 삭제 실패: ${String(e)}`);
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  async function generateReport(period: ReportPeriod) {
+    setReportPeriod(period);
+    setReportText("");
+    setReportError(null);
+    setTelegramStatus("");
+    setReportModalOpen(true);
+    setReportLoading(true);
+
+    const now   = new Date();
+    const since = new Date(now);
+    since.setDate(since.getDate() - REPORT_PERIOD_DAYS[period]);
+
+    // For daily: apply configured time range filter
+    let dailyStartH = 0, dailyStartM = 0, dailyEndH = 23, dailyEndM = 59;
+    if (period === "daily") {
+      try {
+        const startStr = localStorage.getItem("ae_daily_start") ?? "00:00";
+        const endStr   = localStorage.getItem("ae_daily_end")   ?? "23:59";
+        [dailyStartH, dailyStartM] = startStr.split(":").map(Number);
+        [dailyEndH,   dailyEndM]   = endStr.split(":").map(Number);
+      } catch {}
+    }
+
+    // Collect inbox + sent emails within the period
+    const allEmails: { id: string; subject: string; senderName: string; senderEmail: string; date: string; preview: string; folder: string }[] = [];
+    for (const folder of ["inbox", "sent"] as Folder[]) {
+      for (const m of msgCache.current.get(folder) ?? []) {
+        const d = new Date(m.receivedTime);
+        if (d < since) continue;
+        if (period === "daily") {
+          const totalMinutes = d.getHours() * 60 + d.getMinutes();
+          const startMinutes = dailyStartH * 60 + dailyStartM;
+          const endMinutes   = dailyEndH   * 60 + dailyEndM;
+          if (totalMinutes < startMinutes || totalMinutes > endMinutes) continue;
+        }
+        allEmails.push({
+          id: m.entryId.toUpperCase(),
+          subject: m.subject,
+          senderName: m.senderName,
+          senderEmail: m.senderEmail,
+          date: m.receivedTime,
+          preview: m.preview,
+          folder,
+        });
+      }
+    }
+
+    // Load cache
+    let cache: Record<string, { ids: string[]; report: string; ts: number }> = {};
+    try { cache = JSON.parse(localStorage.getItem(REPORT_CACHE_KEY) ?? "{}"); } catch {}
+
+    const hit         = cache[period];
+    const analyzedSet = new Set<string>(hit?.ids ?? []);
+    const newEmails   = allEmails.filter(e => !analyzedSet.has(e.id));
+
+    if (newEmails.length === 0 && hit?.report) {
+      setReportText(hit.report);
+      setReportLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/ai/report", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          period,
+          newEmails,
+          previousReport: hit?.report ?? "",
+          apiKey: openaiKey,
+        }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+
+      const updatedIds = [...Array.from(analyzedSet), ...newEmails.map(e => e.id)];
+      cache[period] = { ids: updatedIds, report: data.report, ts: Date.now() };
+      localStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(cache));
+      setReportText(data.report);
+    } catch (e: unknown) {
+      setReportError(String(e));
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
+  async function sendReportTelegram() {
+    if (!reportText) return;
+    const token  = localStorage.getItem("ae_telegram_token") ?? "";
+    const chatId = localStorage.getItem("ae_telegram_chat_id") ?? "";
+    if (!token || !chatId) {
+      setTelegramStatus("⚙ Settings에서 Telegram 토큰과 Chat ID를 먼저 설정하세요.");
+      return;
+    }
+    setTelegramSending(true);
+    setTelegramStatus("전송 중…");
+    try {
+      const header = `*[${REPORT_PERIOD_LABEL[reportPeriod]}]*\n${new Date().toLocaleString("ko-KR")}\n\n`;
+      const res = await fetch("/api/telegram", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token, chatId, text: header + reportText }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      setTelegramStatus("✓ Telegram 발송 완료");
+    } catch (e: unknown) {
+      setTelegramStatus("✗ " + String(e));
+    } finally {
+      setTelegramSending(false);
+    }
+  }
+
+  async function saveReportToCloud(
+    period: string,
+    title: string,
+    content: string,
+    emailCount: number
+  ) {
+    if (!content) return;
+    setReportSaving(true);
+    setReportShareUrl("");
+    try {
+      const data = await apiFetch<{ id: string; share_token: string | null; is_shared: boolean }>(
+        "/reports",
+        {
+          method: "POST",
+          body: JSON.stringify({ period, title, content, email_count: emailCount, is_shared: false }),
+        }
+      );
+      setReportSaved(true);
+      if (data.share_token) {
+        setReportShareUrl(`${window.location.origin}/reports/shared/${data.share_token}`);
+      }
+      setTimeout(() => setReportSaved(false), 3000);
+    } catch {
+      // silently ignore — cloud save is best-effort
+    } finally {
+      setReportSaving(false);
+    }
+  }
+
+  async function generatePatternAnalysis() {
+    setPatternModalOpen(true);
+    setPatternText("");
+    setPatternError(null);
+    setPatternTgStatus("");
+    setPatternLoading(true);
+
+    // Determine folder scope
+    const scopeFolders: Folder[] = patternScope === "inbox" ? ["inbox"] : patternScope === "sent" ? ["sent"] : ["inbox", "sent"];
+
+    // Determine date cutoff
+    const cutoff = patternDays === "all" ? null : (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - Number(patternDays));
+      return d;
+    })();
+
+    // Collect emails matching scope + date filter
+    const allEmails: { id: string; subject: string; senderName: string; senderEmail: string; date: string; preview: string; folder: string }[] = [];
+    for (const folder of scopeFolders) {
+      for (const m of msgCache.current.get(folder) ?? []) {
+        if (cutoff && new Date(m.receivedTime) < cutoff) continue;
+        allEmails.push({
+          id: m.entryId.toUpperCase(),
+          subject: m.subject,
+          senderName: m.senderName,
+          senderEmail: m.senderEmail,
+          date: m.receivedTime,
+          preview: m.preview,
+          folder,
+        });
+      }
+    }
+
+    // Cache key is scoped to settings so different configurations stay separate
+    const cacheKey = `${PATTERN_CACHE_KEY}_${patternScope}_${patternDays}`;
+
+    let cache: { ids: string[]; analysis: string; ts: number } | null = null;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) cache = JSON.parse(raw);
+    } catch {}
+
+    const analyzedSet = new Set<string>(cache?.ids ?? []);
+    const newEmails   = allEmails.filter(e => !analyzedSet.has(e.id));
+
+    if (newEmails.length === 0 && cache?.analysis) {
+      setPatternText(cache.analysis);
+      setPatternLoading(false);
+      return;
+    }
+
+    const periodLabel = patternDays === "all" ? "전체 기간" : `최근 ${patternDays}일`;
+    const scopeLabel  = patternScope === "inbox" ? "받은 편지함" : patternScope === "sent" ? "보낸 편지함" : "전체 (받은+보낸)";
+
+    try {
+      const res = await fetch("/api/ai/pattern", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          newEmails,
+          previousAnalysis: cache?.analysis ?? "",
+          apiKey: openaiKey,
+          periodLabel,
+          scopeLabel,
+        }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+
+      const updatedIds = [...Array.from(analyzedSet), ...newEmails.map((e: { id: string }) => e.id)];
+      const newCache = { ids: updatedIds, analysis: data.analysis, ts: Date.now() };
+      localStorage.setItem(cacheKey, JSON.stringify(newCache));
+      setPatternText(data.analysis);
+    } catch (e: unknown) {
+      setPatternError(String(e));
+    } finally {
+      setPatternLoading(false);
+    }
+  }
+
+  async function sendPatternTelegram() {
+    if (!patternText) return;
+    const token  = localStorage.getItem("ae_telegram_token") ?? "";
+    const chatId = localStorage.getItem("ae_telegram_chat_id") ?? "";
+    if (!token || !chatId) {
+      setPatternTgStatus("⚙ Set Telegram token and Chat ID in Settings first.");
+      return;
+    }
+    setPatternTgSending(true);
+    setPatternTgStatus("Sending…");
+    try {
+      const header = `*[Work Pattern Analysis]*\n${new Date().toLocaleString("ko-KR")}\n\n`;
+      const res = await fetch("/api/telegram", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token, chatId, text: header + patternText }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      setPatternTgStatus("✓ Sent via Telegram");
+    } catch (e: unknown) {
+      setPatternTgStatus("✗ " + String(e));
+    } finally {
+      setPatternTgSending(false);
+    }
+  }
+
+  async function generateTaskSummary() {
+    setTaskModalOpen(true);
+    setTaskText("");
+    setTaskError(null);
+    setTaskTgStatus("");
+    setTaskLoading(true);
+
+    const scopeFolders: Folder[] = taskScope === "inbox" ? ["inbox"] : taskScope === "sent" ? ["sent"] : ["inbox", "sent"];
+    const cutoff = taskDays === "all" ? null : (() => {
+      const d = new Date(); d.setDate(d.getDate() - Number(taskDays)); return d;
+    })();
+
+    const allEmails: { id: string; subject: string; senderName: string; senderEmail: string; date: string; preview: string; folder: string }[] = [];
+    for (const folder of scopeFolders) {
+      for (const m of msgCache.current.get(folder) ?? []) {
+        if (cutoff && new Date(m.receivedTime) < cutoff) continue;
+        allEmails.push({ id: m.entryId.toUpperCase(), subject: m.subject, senderName: m.senderName, senderEmail: m.senderEmail, date: m.receivedTime, preview: m.preview, folder });
+      }
+    }
+
+    const cacheKey = `${TASK_CACHE_KEY}_${taskScope}_${taskDays}`;
+    let cache: { ids: string[]; summary: string; ts: number } | null = null;
+    try { const raw = localStorage.getItem(cacheKey); if (raw) cache = JSON.parse(raw); } catch {}
+
+    const analyzedSet = new Set<string>(cache?.ids ?? []);
+    const newEmails   = allEmails.filter(e => !analyzedSet.has(e.id));
+
+    if (newEmails.length === 0 && cache?.summary) {
+      setTaskText(cache.summary); setTaskLoading(false); return;
+    }
+
+    const periodLabel = taskDays === "all" ? "전체 기간" : `최근 ${taskDays}일`;
+    const scopeLabel  = taskScope === "inbox" ? "받은 편지함" : taskScope === "sent" ? "보낸 편지함" : "전체 (받은+보낸)";
+
+    try {
+      const res = await fetch("/api/ai/tasks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ newEmails, previousSummary: cache?.summary ?? "", apiKey: openaiKey, periodLabel, scopeLabel }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+
+      const updatedIds = [...Array.from(analyzedSet), ...newEmails.map((e: { id: string }) => e.id)];
+      localStorage.setItem(cacheKey, JSON.stringify({ ids: updatedIds, summary: data.summary, ts: Date.now() }));
+      setTaskText(data.summary);
+    } catch (e: unknown) {
+      setTaskError(String(e));
+    } finally {
+      setTaskLoading(false);
+    }
+  }
+
+  async function sendTaskTelegram() {
+    if (!taskText) return;
+    const token  = localStorage.getItem("ae_telegram_token") ?? "";
+    const chatId = localStorage.getItem("ae_telegram_chat_id") ?? "";
+    if (!token || !chatId) { setTaskTgStatus("⚙ Set Telegram token and Chat ID in Settings first."); return; }
+    setTaskTgSending(true); setTaskTgStatus("Sending…");
+    try {
+      const header = `*[All Task Summary]*\n${new Date().toLocaleString("ko-KR")}\n\n`;
+      const res = await fetch("/api/telegram", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, chatId, text: header + taskText }) });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      setTaskTgStatus("✓ Sent via Telegram");
+    } catch (e: unknown) { setTaskTgStatus("✗ " + String(e)); }
+    finally { setTaskTgSending(false); }
+  }
+
+  // Convert markdown pipe-tables to HTML for draft preview
+  function draftToHtml(text: string): string {
+    const TABLE_ROW = /^\|.+\|$/;
+    const SEP_ROW   = /^\|[\s\-|:]+\|$/;
+    const lines = text.split("\n");
+    const out: string[] = [];
+    let buf: string[] = [];
+    function flush() {
+      if (!buf.length) return;
+      const rows = buf.filter(r => !SEP_ROW.test(r)).map((row, i) => {
+        const cells = row.split("|").slice(1, -1).map(c => c.trim());
+        return i === 0
+          ? `<tr>${cells.map(c => `<th style="background:#e8eef4;font-weight:600;padding:5px 9px;border:1px solid #b0b8c1;text-align:left">${c}</th>`).join("")}</tr>`
+          : `<tr>${cells.map(c => `<td style="padding:5px 9px;border:1px solid #b0b8c1">${c}</td>`).join("")}</tr>`;
+      });
+      out.push(`<table style="border-collapse:collapse;font-size:12px;margin:6px 0">${rows.join("")}</table>`);
+      buf = [];
+    }
+    for (const line of lines) {
+      if (TABLE_ROW.test(line.trim())) { buf.push(line.trim()); }
+      else { flush(); out.push(line); }
+    }
+    flush();
+    return out.join("\n")
+      .split(/(<table[\s\S]*?<\/table>)/)
+      .map((p, i) => i % 2 === 0 ? p.replace(/\n/g, "<br>") : p)
+      .join("");
+  }
+
+  // Shared srcDoc for translation iframes — injects 10px forced font
+  const TRANS_FONT = `<style>*,*::before,*::after,body,p,span,div,td,th,li,a,font{font-size:11px!important;font-family:'고운돋움','Goun Dotum','Dotum','돋움',Arial,sans-serif!important;line-height:1.65!important;}html,body{overflow:hidden!important;margin:0!important;}body{padding:10px 14px!important;}</style>`;
+  const transDoc = transIsHtml
+    ? TRANS_FONT + transResult
+    : `<html><head>${TRANS_FONT}</head><body style="white-space:pre-wrap;color:#1a1a1a">${(transResult).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</body></html>`;
+
+  const isSearching = search.trim().length > 0;
+  const displayMsgs = isSearching ? (() => {
+    const all = new Map<string, OutlookMessage>();
+    for (const f of REAL_FOLDERS) {
+      for (const m of msgCache.current.get(f) ?? []) all.set(m.entryId.toUpperCase(), m);
+    }
+    for (const m of important) all.set(m.entryId.toUpperCase(), m);
+    return Array.from(all.values()).sort(
+      (a, b) => new Date(b.receivedTime).getTime() - new Date(a.receivedTime).getTime()
+    );
+  })() : activeFolder === "important" ? important : messages;
+
+  const searchFolderMap: Map<string, Folder> | null = isSearching ? (() => {
+    const map = new Map<string, Folder>();
+    for (const f of REAL_FOLDERS) {
+      for (const m of msgCache.current.get(f) ?? []) map.set(m.entryId.toUpperCase(), f);
+    }
+    for (const m of important) map.set(m.entryId.toUpperCase(), "important");
+    return map;
+  })() : null;
+
+  const filtered = displayMsgs.filter(m => {
+    if (!search.trim()) return true;
+    const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
+    const haystack = [m.subject, m.senderName, m.senderEmail, m.preview].join(" ").toLowerCase();
+    return terms.every(t => haystack.includes(t));
+  });
+  const unreadCount = (msgCache.current.get("inbox") ?? messages).filter(m => m.isUnread).length;
+  const isTagged    = (msg: OutlookMessage) => important.some(m => m.entryId === msg.entryId);
+
+  return (
+    <>
+      {settingsOpen && (
+        <SettingsModal initial={{ openaiKey }} onSave={handleSaveSettings} onClose={() => setSettingsOpen(false)}/>
+      )}
+      {recipOpen && (
+        <RecipientModal
+          pool={recipPool}
+          onConfirm={handleRecipConfirm}
+          onClose={() => setRecipOpen(false)}
+        />
+      )}
+      {/* ── Report modal ──────────────────────────────────────────────────── */}
+      {reportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setReportModalOpen(false)}>
+          <div className="flex w-full max-w-2xl flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ maxHeight: "90vh" }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-ink-100 px-5 py-3">
+              <div className="min-w-0">
+                <span className="text-[14px] font-bold text-ink-900">{REPORT_PERIOD_LABEL[reportPeriod]}</span>
+                <span className="ml-2 text-[11px] text-ink-400">{new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Regenerate */}
+                <button onClick={() => generateReport(reportPeriod)} disabled={reportLoading}
+                  title="새로 생성"
+                  className="flex h-7 w-7 items-center justify-center rounded text-ink-400 hover:bg-ink-100 disabled:opacity-40">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={reportLoading ? "animate-spin" : ""}>
+                    <path d="M4 12a8 8 0 018-8 8 8 0 016.93 4M20 12a8 8 0 01-8 8 8 8 0 01-6.93-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                    <path d="M19 4v4h-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <button onClick={() => setReportModalOpen(false)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 text-[18px]">×</button>
+              </div>
+            </div>
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1 min-h-0">
+              {reportLoading ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-16 text-ink-400">
+                  <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#0078d4] border-t-transparent"/>
+                  <span className="text-[12px]">Analyzing emails…</span>
+                </div>
+              ) : reportError ? (
+                <div className="rounded border border-red-200 bg-red-50 p-4 text-[12px] text-red-600">{reportError}</div>
+              ) : reportText ? (
+                (() => {
+                  const stripEmoji = (s: string) =>
+                    s.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{200D}]/gu, "").trim();
+                  const lines = reportText.split("\n");
+                  const nodes: React.ReactNode[] = [];
+                  let key = 0;
+                  for (const raw of lines) {
+                    const line = stripEmoji(raw.trim());
+                    if (!line) continue;
+                    if (line.startsWith("## ")) {
+                      nodes.push(
+                        <div key={key++} className="mt-5 first:mt-0 border-b border-[#0f3460] pb-1">
+                          <span className="text-[13px] font-bold text-[#0f3460]">{stripEmoji(line.replace(/^##\s*/, ""))}</span>
+                        </div>
+                      );
+                    } else if (line.startsWith("### ")) {
+                      nodes.push(
+                        <div key={key++} className="mt-3 mb-0.5">
+                          <span className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-500">{stripEmoji(line.replace(/^###\s*/, ""))}</span>
+                        </div>
+                      );
+                    } else if (/^[•\-\*]\s/.test(line)) {
+                      const clean = stripEmoji(line.replace(/^[•\-\*]\s*/, ""));
+                      const parts = clean.split(/(\*\*[^*]+\*\*)/g);
+                      nodes.push(
+                        <div key={key++} className="flex items-start gap-2 pl-2">
+                          <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink-400"/>
+                          <span className="text-[12.5px] leading-relaxed text-ink-800">
+                            {parts.map((p, pi) =>
+                              p.startsWith("**") && p.endsWith("**")
+                                ? <strong key={pi} className="font-semibold text-ink-900">{p.slice(2, -2)}</strong>
+                                : p
+                            )}
+                          </span>
+                        </div>
+                      );
+                    } else {
+                      nodes.push(
+                        <p key={key++} className="pl-2 text-[12.5px] leading-relaxed text-ink-600">{stripEmoji(line)}</p>
+                      );
+                    }
+                  }
+                  return nodes;
+                })()
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 py-16 text-ink-300">
+                  <span className="text-[13px]">No emails to analyze</span>
+                  <span className="text-[11px]">Load Inbox / Sent first</span>
+                </div>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="flex shrink-0 flex-col gap-2 border-t border-ink-100 px-5 py-3">
+              {telegramStatus && (
+                <p className={`text-[11px] font-medium ${telegramStatus.startsWith("✓") ? "text-green-600" : telegramStatus.startsWith("⚙") || telegramStatus.includes("중") ? "text-ink-400" : "text-red-500"}`}>
+                  {telegramStatus}
+                </p>
+              )}
+              {reportShareUrl && (
+                <div className="flex items-center gap-2 rounded bg-green-50 border border-green-200 px-3 py-1.5">
+                  <span className="text-[11px] text-green-700 font-medium">Share link:</span>
+                  <a href={reportShareUrl} target="_blank" rel="noreferrer"
+                    className="text-[11px] text-blue-600 underline truncate max-w-[260px]">{reportShareUrl}</a>
+                  <button onClick={() => navigator.clipboard.writeText(reportShareUrl)}
+                    className="ml-auto shrink-0 text-[11px] text-green-700 hover:text-green-900">Copy</button>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <button
+                  onClick={sendReportTelegram}
+                  disabled={!reportText || telegramSending || reportLoading}
+                  className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${
+                    !reportText || telegramSending || reportLoading
+                      ? "border-ink-200 text-ink-300 cursor-not-allowed"
+                      : "border-[#229ED9] text-[#229ED9] hover:bg-[#229ED9] hover:text-white"
+                  }`}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  {telegramSending ? "Sending…" : "Send via Telegram"}
+                </button>
+                <div className="flex gap-2 flex-wrap">
+                  {process.env.NEXT_PUBLIC_API_URL && (
+                    <button
+                      onClick={() => saveReportToCloud(
+                        reportPeriod,
+                        `${REPORT_PERIOD_LABEL[reportPeriod]} — ${new Date().toLocaleDateString("en-US")}`,
+                        reportText,
+                        (msgCache.current.get("inbox")?.length ?? 0) + (msgCache.current.get("sent")?.length ?? 0)
+                      )}
+                      disabled={!reportText || reportSaving || reportLoading}
+                      className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${
+                        reportSaved
+                          ? "border-green-500 text-green-600 bg-green-50"
+                          : !reportText || reportSaving || reportLoading
+                            ? "border-ink-200 text-ink-300 cursor-not-allowed"
+                            : "border-purple-500 text-purple-600 hover:bg-purple-50"
+                      }`}>
+                      {reportSaving ? "Saving…" : reportSaved ? "✓ Saved" : "☁ Save to Cloud"}
+                    </button>
+                  )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(reportText);
+                        setReportCopied(true);
+                        setTimeout(() => setReportCopied(false), 2000);
+                      } catch {}
+                    }}
+                    disabled={!reportText}
+                    className="rounded border border-[#0f3460] px-4 py-1.5 text-[12px] font-medium text-[#0f3460] hover:bg-[#f5f6f8] transition disabled:opacity-40 whitespace-nowrap">
+                    {reportCopied ? "✓ Copied" : "Copy"}
+                  </button>
+                  <button onClick={() => setReportModalOpen(false)}
+                    className="rounded bg-[#0f3460] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#0a2342] whitespace-nowrap">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Work Pattern Analysis modal ──────────────────────────────────── */}
+      {patternModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setPatternModalOpen(false)}>
+          <div className="flex w-full max-w-2xl flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ maxHeight: "90vh" }} onClick={e => e.stopPropagation()}>
+            <div className="shrink-0 border-b border-ink-100 px-5 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] font-bold text-ink-900">Work Pattern Analysis</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={generatePatternAnalysis} disabled={patternLoading}
+                    title="Regenerate"
+                    className="flex h-7 w-7 items-center justify-center rounded text-ink-400 hover:bg-ink-100 disabled:opacity-40">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={patternLoading ? "animate-spin" : ""}>
+                      <path d="M4 12a8 8 0 018-8 8 8 0 016.93 4M20 12a8 8 0 01-8 8 8 8 0 01-6.93-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      <path d="M19 4v4h-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                  <button onClick={() => setPatternModalOpen(false)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 text-[18px]">×</button>
+                </div>
+              </div>
+              {/* Scope badges + inline selects for changing settings from modal */}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide">Period</span>
+                  <select value={patternDays} onChange={e => setPatternDays(e.target.value as typeof patternDays)}
+                    className="rounded border border-ink-200 px-2 py-0.5 text-[11px] text-ink-700 focus:border-[#0078d4] focus:outline-none bg-white">
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="180">Last 180 days</option>
+                    <option value="365">Last 1 year</option>
+                    <option value="all">All</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide">Folder</span>
+                  <select value={patternScope} onChange={e => setPatternScope(e.target.value as typeof patternScope)}
+                    className="rounded border border-ink-200 px-2 py-0.5 text-[11px] text-ink-700 focus:border-[#0078d4] focus:outline-none bg-white">
+                    <option value="all">All (Inbox + Sent)</option>
+                    <option value="inbox">Inbox only</option>
+                    <option value="sent">Sent only</option>
+                  </select>
+                </div>
+                <button onClick={generatePatternAnalysis} disabled={patternLoading}
+                  className="rounded bg-[#0f3460] px-3 py-0.5 text-[11px] font-semibold text-white hover:bg-[#0a2342] disabled:opacity-40 whitespace-nowrap">
+                  {patternLoading ? "Analyzing…" : "Run"}
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1 min-h-0">
+              {patternLoading ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-16 text-ink-400">
+                  <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#0078d4] border-t-transparent"/>
+                  <span className="text-[12px]">Analyzing work patterns…</span>
+                </div>
+              ) : patternError ? (
+                <div className="rounded border border-red-200 bg-red-50 p-4 text-[12px] text-red-600">{patternError}</div>
+              ) : patternText ? (
+                (() => {
+                  const stripEmoji = (s: string) =>
+                    s.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{200D}]/gu, "").trim();
+                  const lines = patternText.split("\n");
+                  const nodes: React.ReactNode[] = [];
+                  let key = 0;
+                  for (const raw of lines) {
+                    const line = stripEmoji(raw.trim());
+                    if (!line) continue;
+                    if (line.startsWith("## ")) {
+                      nodes.push(
+                        <div key={key++} className="mt-5 first:mt-0 border-b border-[#0f3460] pb-1">
+                          <span className="text-[13px] font-bold text-[#0f3460]">{stripEmoji(line.replace(/^##\s*/, ""))}</span>
+                        </div>
+                      );
+                    } else if (line.startsWith("### ")) {
+                      nodes.push(
+                        <div key={key++} className="mt-3 mb-0.5">
+                          <span className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-500">{stripEmoji(line.replace(/^###\s*/, ""))}</span>
+                        </div>
+                      );
+                    } else if (/^[•\-\*]\s/.test(line)) {
+                      const clean = stripEmoji(line.replace(/^[•\-\*]\s*/, ""));
+                      const parts = clean.split(/(\*\*[^*]+\*\*)/g);
+                      nodes.push(
+                        <div key={key++} className="flex items-start gap-2 pl-2">
+                          <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink-400"/>
+                          <span className="text-[12.5px] leading-relaxed text-ink-800">
+                            {parts.map((p, pi) =>
+                              p.startsWith("**") && p.endsWith("**")
+                                ? <strong key={pi} className="font-semibold text-ink-900">{p.slice(2, -2)}</strong>
+                                : p
+                            )}
+                          </span>
+                        </div>
+                      );
+                    } else {
+                      nodes.push(
+                        <p key={key++} className="pl-2 text-[12.5px] leading-relaxed text-ink-600">{stripEmoji(line)}</p>
+                      );
+                    }
+                  }
+                  return nodes;
+                })()
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 py-16 text-ink-300">
+                  <span className="text-[13px]">No emails to analyze</span>
+                  <span className="text-[11px]">Load Inbox / Sent first</span>
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 border-t border-ink-100 px-5 py-3">
+              {patternTgStatus && (
+                <p className={`text-[11px] font-medium ${patternTgStatus.startsWith("✓") ? "text-green-600" : patternTgStatus.startsWith("⚙") || patternTgStatus.includes("ing") ? "text-ink-400" : "text-red-500"}`}>
+                  {patternTgStatus}
+                </p>
+              )}
+              <div className="flex items-center justify-between">
+                <button onClick={sendPatternTelegram}
+                  disabled={!patternText || patternTgSending || patternLoading}
+                  className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${
+                    !patternText || patternTgSending || patternLoading
+                      ? "border-ink-200 text-ink-300 cursor-not-allowed"
+                      : "border-[#229ED9] text-[#229ED9] hover:bg-[#229ED9] hover:text-white"
+                  }`}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  {patternTgSending ? "Sending…" : "Send via Telegram"}
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(patternText);
+                        setPatternCopied(true);
+                        setTimeout(() => setPatternCopied(false), 2000);
+                      } catch {}
+                    }}
+                    disabled={!patternText}
+                    className="rounded border border-[#0f3460] px-4 py-1.5 text-[12px] font-medium text-[#0f3460] hover:bg-[#f5f6f8] transition disabled:opacity-40 whitespace-nowrap">
+                    {patternCopied ? "✓ Copied" : "Copy"}
+                  </button>
+                  <button onClick={() => setPatternModalOpen(false)}
+                    className="rounded bg-[#0f3460] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#0a2342] whitespace-nowrap">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── All Task Summary modal ───────────────────────────────────────── */}
+      {taskModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setTaskModalOpen(false)}>
+          <div className="flex w-full max-w-2xl flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ maxHeight: "90vh" }} onClick={e => e.stopPropagation()}>
+            <div className="shrink-0 border-b border-ink-100 px-5 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] font-bold text-ink-900">All Task Summary</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={generateTaskSummary} disabled={taskLoading} title="Regenerate"
+                    className="flex h-7 w-7 items-center justify-center rounded text-ink-400 hover:bg-ink-100 disabled:opacity-40">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={taskLoading ? "animate-spin" : ""}>
+                      <path d="M4 12a8 8 0 018-8 8 8 0 016.93 4M20 12a8 8 0 01-8 8 8 8 0 01-6.93-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                      <path d="M19 4v4h-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                  <button onClick={() => setTaskModalOpen(false)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 text-[18px]">×</button>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide">Period</span>
+                  <select value={taskDays} onChange={e => setTaskDays(e.target.value as typeof taskDays)}
+                    className="rounded border border-ink-200 px-2 py-0.5 text-[11px] text-ink-700 focus:border-[#0078d4] focus:outline-none bg-white">
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="180">Last 180 days</option>
+                    <option value="365">Last 1 year</option>
+                    <option value="all">All</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold text-ink-400 uppercase tracking-wide">Folder</span>
+                  <select value={taskScope} onChange={e => setTaskScope(e.target.value as typeof taskScope)}
+                    className="rounded border border-ink-200 px-2 py-0.5 text-[11px] text-ink-700 focus:border-[#0078d4] focus:outline-none bg-white">
+                    <option value="all">All (Inbox + Sent)</option>
+                    <option value="inbox">Inbox only</option>
+                    <option value="sent">Sent only</option>
+                  </select>
+                </div>
+                <button onClick={generateTaskSummary} disabled={taskLoading}
+                  className="rounded bg-[#0f3460] px-3 py-0.5 text-[11px] font-semibold text-white hover:bg-[#0a2342] disabled:opacity-40 whitespace-nowrap">
+                  {taskLoading ? "Analyzing…" : "Run"}
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1 min-h-0">
+              {taskLoading ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-16 text-ink-400">
+                  <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#0078d4] border-t-transparent"/>
+                  <span className="text-[12px]">Summarizing all tasks…</span>
+                </div>
+              ) : taskError ? (
+                <div className="rounded border border-red-200 bg-red-50 p-4 text-[12px] text-red-600">{taskError}</div>
+              ) : taskText ? (
+                (() => {
+                  const stripEmoji = (s: string) =>
+                    s.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{200D}]/gu, "").trim();
+                  const lines = taskText.split("\n");
+                  const nodes: React.ReactNode[] = [];
+                  let key = 0;
+                  for (const raw of lines) {
+                    const line = stripEmoji(raw.trim());
+                    if (!line) continue;
+                    if (line.startsWith("## ")) {
+                      nodes.push(<div key={key++} className="mt-5 first:mt-0 border-b border-[#0f3460] pb-1"><span className="text-[13px] font-bold text-[#0f3460]">{stripEmoji(line.replace(/^##\s*/, ""))}</span></div>);
+                    } else if (line.startsWith("### ")) {
+                      nodes.push(<div key={key++} className="mt-3 mb-0.5"><span className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-500">{stripEmoji(line.replace(/^###\s*/, ""))}</span></div>);
+                    } else if (/^[•\-\*]\s/.test(line)) {
+                      const clean = stripEmoji(line.replace(/^[•\-\*]\s*/, ""));
+                      const parts = clean.split(/(\*\*[^*]+\*\*)/g);
+                      nodes.push(<div key={key++} className="flex items-start gap-2 pl-2"><span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink-400"/><span className="text-[12.5px] leading-relaxed text-ink-800">{parts.map((p, pi) => p.startsWith("**") && p.endsWith("**") ? <strong key={pi} className="font-semibold text-ink-900">{p.slice(2, -2)}</strong> : p)}</span></div>);
+                    } else {
+                      nodes.push(<p key={key++} className="pl-2 text-[12.5px] leading-relaxed text-ink-600">{stripEmoji(line)}</p>);
+                    }
+                  }
+                  return nodes;
+                })()
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 py-16 text-ink-300">
+                  <span className="text-[13px]">No emails to analyze</span>
+                  <span className="text-[11px]">Load Inbox / Sent first</span>
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 border-t border-ink-100 px-5 py-3">
+              {taskTgStatus && (
+                <p className={`text-[11px] font-medium ${taskTgStatus.startsWith("✓") ? "text-green-600" : taskTgStatus.startsWith("⚙") || taskTgStatus.includes("ing") ? "text-ink-400" : "text-red-500"}`}>{taskTgStatus}</p>
+              )}
+              <div className="flex items-center justify-between">
+                <button onClick={sendTaskTelegram} disabled={!taskText || taskTgSending || taskLoading}
+                  className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${!taskText || taskTgSending || taskLoading ? "border-ink-200 text-ink-300 cursor-not-allowed" : "border-[#229ED9] text-[#229ED9] hover:bg-[#229ED9] hover:text-white"}`}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  {taskTgSending ? "Sending…" : "Send via Telegram"}
+                </button>
+                <div className="flex gap-2">
+                  <button onClick={async () => { try { await navigator.clipboard.writeText(taskText); setTaskCopied(true); setTimeout(() => setTaskCopied(false), 2000); } catch {} }}
+                    disabled={!taskText}
+                    className="rounded border border-[#0f3460] px-4 py-1.5 text-[12px] font-medium text-[#0f3460] hover:bg-[#f5f6f8] transition disabled:opacity-40 whitespace-nowrap">
+                    {taskCopied ? "✓ Copied" : "Copy"}
+                  </button>
+                  <button onClick={() => setTaskModalOpen(false)}
+                    className="rounded bg-[#0f3460] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#0a2342] whitespace-nowrap">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Summary modal ─────────────────────────────────────────────────── */}
+      {summaryOpen && summaryText && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setSummaryOpen(false)}>
+          <div className="flex w-full max-w-2xl flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ maxHeight: "88vh" }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-ink-100 px-5 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="min-w-0">
+                  <span className="text-[14px] font-bold text-ink-900">Thread Report</span>
+                  <span className="ml-2 text-[11px] text-ink-400 truncate">{selected?.subject ?? ""}</span>
+                </div>
+              </div>
+              <button onClick={() => setSummaryOpen(false)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 text-[18px]">×</button>
+            </div>
+            {/* Body — report renderer */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+              {(() => {
+                // Strip emojis then parse markdown
+                const stripEmoji = (s: string) =>
+                  s.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{200D}]/gu, "").trim();
+                const lines = summaryText.split("\n");
+                const nodes: React.ReactNode[] = [];
+                let key = 0;
+                for (const raw of lines) {
+                  const line = stripEmoji(raw.trim());
+                  if (!line) continue;
+                  if (line.startsWith("## ")) {
+                    const title = stripEmoji(line.replace(/^##\s*/, ""));
+                    nodes.push(
+                      <div key={key++} className="mt-5 first:mt-0 border-b border-[#0f3460] pb-1">
+                        <span className="text-[13px] font-bold text-[#0f3460]">{title}</span>
+                      </div>
+                    );
+                  } else if (line.startsWith("### ")) {
+                    const title = stripEmoji(line.replace(/^###\s*/, ""));
+                    nodes.push(
+                      <div key={key++} className="mt-3 mb-0.5">
+                        <span className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-500">{title}</span>
+                      </div>
+                    );
+                  } else if (/^[•\-\*]\s/.test(line)) {
+                    const clean = stripEmoji(line.replace(/^[•\-\*]\s*/, ""));
+                    const parts = clean.split(/(\*\*[^*]+\*\*)/g);
+                    nodes.push(
+                      <div key={key++} className="flex items-start gap-2 pl-2">
+                        <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink-400"/>
+                        <span className="text-[12.5px] leading-relaxed text-ink-800">
+                          {parts.map((p, pi) =>
+                            p.startsWith("**") && p.endsWith("**")
+                              ? <strong key={pi} className="font-semibold text-ink-900">{p.slice(2, -2)}</strong>
+                              : p
+                          )}
+                        </span>
+                      </div>
+                    );
+                  } else {
+                    nodes.push(
+                      <p key={key++} className="pl-2 text-[12.5px] leading-relaxed text-ink-600">{stripEmoji(line)}</p>
+                    );
+                  }
+                }
+                return nodes;
+              })()}
+            </div>
+            {/* Footer */}
+            <div className="flex shrink-0 items-center justify-between border-t border-ink-100 px-5 py-3">
+              <span className="text-[11px] text-ink-400">
+                {thread.length}개 메시지 기준
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(summaryText);
+                      setSummaryCopied(true);
+                      setTimeout(() => setSummaryCopied(false), 2000);
+                    } catch {}
+                  }}
+                  className="rounded border border-[#0f3460] px-4 py-1.5 text-[12px] font-medium text-[#0f3460] hover:bg-[#f5f6f8] transition">
+                  {summaryCopied ? "✓ Copied" : "Copy"}
+                </button>
+                <button onClick={() => setSummaryOpen(false)}
+                  className="rounded bg-[#0f3460] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#0a2342]">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {transModalOpen && transResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex w-full max-w-[1200px] flex-col rounded-xl border border-ink-200 bg-white shadow-2xl" style={{ maxHeight: "90vh" }}>
+            <div className="flex shrink-0 items-center justify-between border-b border-ink-100 px-5 py-3">
+              <span className="text-[14px] font-semibold">Translation ({transLang})</span>
+              <button onClick={() => setTransModalOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 text-[16px]">×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 py-2">
+              <iframe
+                srcDoc={transDoc}
+                sandbox="allow-scripts allow-same-origin"
+                className="w-full rounded border-none"
+                style={{ minHeight: 300, height: transIframeH, maxHeight: "80vh" }}
+                onLoad={e => {
+                  const frame = e.currentTarget;
+                  const measure = () => {
+                    try {
+                      const doc = frame.contentDocument;
+                      const h = Math.max(doc?.documentElement?.scrollHeight ?? 0, doc?.body?.scrollHeight ?? 0, 200) + 20;
+                      setTransIframeH(h);
+                    } catch {}
+                  };
+                  measure();
+                  setTimeout(measure, 400);
+                }}
+              />
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-ink-100 px-5 py-3">
+              <button
+                onClick={async () => {
+                  try {
+                    const html = transIsHtml ? transResult : `<pre style="font-family:inherit;white-space:pre-wrap">${transResult.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre>`;
+                    const plain = transResult.replace(/<[^>]+>/g, "").replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&").trim();
+                    if (typeof ClipboardItem !== "undefined") {
+                      await navigator.clipboard.write([new ClipboardItem({
+                        "text/html":  new Blob([html],  { type: "text/html" }),
+                        "text/plain": new Blob([plain], { type: "text/plain" }),
+                      })]);
+                    } else {
+                      await navigator.clipboard.writeText(plain);
+                    }
+                    setCopyDone(true);
+                    setTimeout(() => setCopyDone(false), 2000);
+                  } catch {}
+                }}
+                className="rounded border border-[#0f3460] px-4 py-1.5 text-[12px] font-medium text-[#0f3460] hover:bg-[#0f3460] hover:text-white transition whitespace-nowrap">
+                Copy
+              </button>
+              <button onClick={() => setTransModalOpen(false)}
+                className="rounded bg-[#0f3460] px-4 py-1.5 text-[12px] font-semibold text-white hover:bg-[#0a2342] whitespace-nowrap">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Send success overlay ─────────────────────────────────────────── */}
+      {sendSuccess && (
+        <div className="success-overlay fixed inset-0 z-[200] flex items-center justify-center bg-black/30 pointer-events-none">
+          <div className={`success-card${sendSuccessOut ? " success-card-out" : ""} flex flex-col items-center gap-4 rounded-2xl bg-white px-12 py-10 shadow-2xl`}>
+            <div className="success-ring flex h-20 w-20 items-center justify-center rounded-full bg-green-500 shadow-lg shadow-green-200">
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
+                <path className="success-check" d="M4 12l5.5 5.5L20 6" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-[18px] font-bold text-gray-800">Sent!</p>
+              <p className="mt-1 text-[12px] text-gray-500">Saved to Outlook Sent Items</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Compose popup window ─────────────────────────────────────────── */}
+      {composeOpen && (
+        <div className="fixed bottom-4 right-4 z-50 flex w-[540px] flex-col rounded-xl border border-ink-200 bg-white shadow-2xl"
+          style={{ maxHeight: "calc(100dvh - 80px)" }}>
+          {/* Title bar */}
+          <div className="flex shrink-0 items-center justify-between rounded-t-xl bg-[#0f3460] px-4 py-2.5">
+            <span className="text-[13px] font-semibold text-white">
+              {replyAction === "reply" ? "Reply" : replyAction === "replyAll" ? "Reply All" : "Forward"}
+              {selected && <span className="ml-2 font-normal text-white/60 truncate max-w-[280px] inline-block align-bottom text-[11px]">{selected.subject}</span>}
+            </span>
+            <button onClick={() => { setComposeOpen(false); setComposeBody(""); }}
+              className="flex h-6 w-6 items-center justify-center rounded text-white/60 hover:text-white hover:bg-white/20 text-[18px] leading-none">×</button>
+          </div>
+          {/* To */}
+          <div className="flex shrink-0 items-center border-b border-ink-100 px-4">
+            <span className="w-10 shrink-0 text-[11px] font-medium text-ink-400">To</span>
+            <input
+              autoFocus
+              value={composeToStr}
+              onChange={e => setComposeToStr(e.target.value)}
+              placeholder="Email address (separate with semicolons)"
+              className="flex-1 bg-transparent py-2.5 text-[12px] text-ink-800 focus:outline-none placeholder:text-ink-300"
+            />
+          </div>
+          {/* CC */}
+          <div className="flex shrink-0 items-center border-b border-ink-100 px-4">
+            <span className="w-10 shrink-0 text-[11px] font-medium text-ink-400">CC</span>
+            <input
+              value={composeCcStr}
+              onChange={e => setComposeCcStr(e.target.value)}
+              placeholder="CC email (optional)"
+              className="flex-1 bg-transparent py-2.5 text-[12px] text-ink-800 focus:outline-none placeholder:text-ink-300"
+            />
+          </div>
+          {/* Body */}
+          <textarea
+            value={composeBody}
+            onChange={e => setComposeBody(e.target.value)}
+            placeholder={replyAction === "forward" ? "Enter forwarding message…" : "Enter reply…"}
+            className="min-h-[120px] flex-1 resize-none bg-white px-4 py-3 text-[12px] leading-relaxed text-ink-800 focus:outline-none placeholder:text-ink-300"
+          />
+          {/* Quoted original email */}
+          {(() => {
+            const latest = thread[thread.length - 1];
+            if (!selected) return null;
+            const senderDisplay = (latest?.senderName ?? selected.senderName) +
+              " &lt;" + (latest?.senderEmail ?? selected.senderEmail) + "&gt;";
+            const dateStr = formatDate(latest?.sentOn ?? selected.receivedTime);
+            const toRecips = (latest?.recipients ?? [])
+              .filter(r => r.rtype === 1).map(r => r.name || r.email).join("; ");
+            const subjectStr = (selected.subject ?? "").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+            let bodyHtml = "";
+            if (latest?.htmlBody) {
+              bodyHtml = latest.htmlBody;
+            } else if (latest?.body) {
+              bodyHtml = `<pre style="white-space:pre-wrap;font-size:11px;font-family:Calibri,Arial,sans-serif;margin:0">${latest.body.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre>`;
+            }
+            const label = replyAction === "forward" ? "전달된 메시지" : "원본 메시지";
+            const srcDoc = `<!DOCTYPE html><html><head><style>*{box-sizing:border-box}html,body{margin:0;padding:0;overflow:hidden}body{font-family:Calibri,Arial,sans-serif;font-size:11px;color:#333;padding:8px 12px}.hdr{color:#666;font-size:11px;padding-bottom:6px;border-bottom:1px solid #e0e0e0;margin-bottom:8px}.hdr b{color:#555}</style></head><body><div class="hdr"><b>----- ${label} -----</b><br/><b>보낸 사람:</b> ${senderDisplay}<br/><b>보낸 날짜:</b> ${dateStr}<br/>${toRecips ? `<b>받는 사람:</b> ${toRecips}<br/>` : ""}<b>제목:</b> ${subjectStr}</div>${bodyHtml}</body></html>`;
+            return (
+              <div className="shrink-0 border-t border-ink-100" style={{ height: 180 }}>
+                {threadLoading
+                  ? <div className="flex h-full items-center justify-center text-[11px] text-ink-400">원본 메일 불러오는 중…</div>
+                  : <iframe srcDoc={srcDoc} sandbox="allow-same-origin" className="w-full border-none" style={{ height: 180 }}/>
+                }
+              </div>
+            );
+          })()}
+          {/* Footer */}
+          <div className="flex shrink-0 items-center justify-between border-t border-ink-100 px-4 py-3">
+            {replyStatus && (
+              <span className={`text-[11px] font-medium ${replyStatus.startsWith("✓") ? "text-green-600" : replyStatus.includes("중") ? "text-ink-400" : "text-red-500"}`}>
+                {replyStatus}
+              </span>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={() => { setComposeOpen(false); setComposeBody(""); }}
+                className="rounded border border-ink-200 px-4 py-1.5 text-[12px] text-ink-600 hover:bg-ink-50 whitespace-nowrap">
+                Cancel
+              </button>
+              <button onClick={sendCompose} disabled={composeSending || !composeToStr.trim()}
+                className={`flex items-center gap-1.5 rounded px-4 py-1.5 text-[12px] font-semibold transition whitespace-nowrap ${
+                  composeSending || !composeToStr.trim()
+                    ? "bg-ink-100 text-ink-400 cursor-not-allowed"
+                    : "bg-[#0078d4] text-white hover:bg-[#005fa3]"
+                }`}>
+                {composeSending ? (
+                  <>
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent"/>
+                    Sending…
+                  </>
+                ) : (
+                  <>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                      <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Send
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Copy toast */}
+      {copyDone && (
+        <div className="pointer-events-none fixed inset-x-0 top-5 z-[200] flex justify-center">
+          <div className="flex items-center gap-2 rounded-lg bg-[#1a3a5c] px-5 py-2.5 text-[13px] font-medium text-white shadow-xl">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Copied with formatting
+          </div>
+        </div>
+      )}
+
+      <div className="flex h-[calc(100dvh-40px)] flex-col overflow-hidden bg-white">
+        {/* Top bar */}
+        <div className="flex h-10 shrink-0 items-center gap-2 bg-[#0f3460] px-2 text-white">
+          {/* Search */}
+          <div className="flex flex-1 h-7 items-center rounded border border-white/20 bg-white/10 px-2.5">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="mr-1.5 shrink-0 opacity-50">
+              <path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search mail…"
+              className="flex-1 bg-transparent text-[12px] text-white placeholder:text-white/40 focus:outline-none min-w-0"/>
+            {search && <button onClick={() => setSearch("")} className="text-white/50 hover:text-white ml-1 text-[14px] leading-none">×</button>}
+          </div>
+          {/* Refresh */}
+          <button
+            onClick={async () => { setIsRefreshing(true); try { await loadMessages(activeFolder, true); } finally { setIsRefreshing(false); } }}
+            disabled={isRefreshing} title="새로고침"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-white/10 disabled:opacity-40">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={isRefreshing ? "animate-spin" : "transition-transform hover:rotate-180 duration-300"}>
+              <path d="M4 12a8 8 0 018-8 8 8 0 016.93 4M20 12a8 8 0 01-8 8 8 8 0 01-6.93-4" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+              <path d="M19 4v4h-4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          {/* Settings */}
+          <button onClick={() => setSettingsOpen(true)} title="설정"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-white/10">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="3" stroke="white" strokeWidth="1.8"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="white" strokeWidth="1.8"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex flex-1 min-h-0">
+          {/* Folder pane */}
+          <aside className={`${mobileView === "folders" ? "flex" : "hidden"} md:flex w-full md:w-[220px] shrink-0 flex-col bg-[#f3f6fb] border-r border-ink-200`}>
+            <div className="px-3 py-3">
+              <button className="flex w-full items-center gap-2 rounded border border-[#0078d4] bg-white px-3 py-2 text-[13px] font-medium text-[#0078d4] hover:bg-[#deecf9] whitespace-nowrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                New Mail
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto px-2 pb-2">
+              {(["inbox", "toMe", ...REAL_FOLDERS.slice(1), "important"] as Folder[]).map(f => (
+                <button key={f} onClick={() => {
+                  setActiveFolder(f);
+                  setCheckedIds(new Set());
+                  setMobileView("list");
+                  if (f === "important") {
+                    const imp = important;
+                    setMessages(imp); setThread([]);
+                    if (imp.length > 0) selectMessage(imp[0]); else setSelected(null);
+                  } else if (f === "toMe") {
+                    const toMe = (msgCache.current.get("inbox") ?? []).filter(m => !!m.isToMe);
+                    setMessages(toMe); setThread([]);
+                    if (toMe.length > 0) selectMessage(toMe[0]); else setSelected(null);
+                  } else loadMessages(f, false);
+                }}
+                  className={`flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-[13px] transition ${
+                    activeFolder === f
+                      ? f === "important" ? "bg-[#f5f6f8] font-semibold text-[#0f3460]" : "bg-[#deecf9] font-semibold text-[#0f3460]"
+                      : "text-[#3c3c3c] hover:bg-white hover:text-black"
+                  }`}>
+                  <span>{FOLDER_LABELS[f]}</span>
+                  {f === "inbox" && unreadCount > 0 && (
+                    <span className="rounded-full bg-[#0078d4] px-1.5 text-[10px] font-bold text-white">{unreadCount}</span>
+                  )}
+                  {f === "toMe" && (
+                    <span className="rounded-full bg-[#0f3460] px-1.5 text-[10px] font-bold text-white">
+                      {(msgCache.current.get("inbox") ?? []).filter(m => !!m.isToMe).length}
+                    </span>
+                  )}
+                  {f === "important" && important.length > 0 && (
+                    <span className="rounded-full bg-[#0f3460] px-1.5 text-[10px] font-bold text-white">{important.length}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+            {/* Report section */}
+            <div className="border-t border-ink-200 px-2 pt-2 pb-1">
+              <div className="mb-1 px-1 text-[10px] font-bold uppercase tracking-widest text-ink-400">Report</div>
+              {(["daily", "weekly", "monthly"] as ReportPeriod[]).map(p => (
+                <button key={p} onClick={() => generateReport(p)}
+                  disabled={reportLoading}
+                  className={`mb-0.5 flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-[12px] transition whitespace-nowrap ${
+                    reportLoading && reportPeriod === p
+                      ? "bg-[#deecf9] text-[#0f3460] font-semibold"
+                      : "text-[#3c3c3c] hover:bg-white hover:text-black"
+                  }`}>
+                  <span>{REPORT_PERIOD_LABEL[p]}</span>
+                  {reportLoading && reportPeriod === p && (
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#0078d4] border-t-transparent shrink-0"/>
+                  )}
+                </button>
+              ))}
+              {/* Pattern Analysis settings */}
+              <div className="mt-1 mb-0.5 space-y-1 rounded bg-white border border-ink-200 px-2 py-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-10 shrink-0 text-[9px] font-bold uppercase tracking-wide text-ink-400">Period</span>
+                  <select value={patternDays} onChange={e => setPatternDays(e.target.value as typeof patternDays)}
+                    className="flex-1 rounded border border-ink-200 px-1.5 py-0.5 text-[10px] text-ink-700 focus:border-[#0078d4] focus:outline-none bg-white">
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="180">Last 180 days</option>
+                    <option value="365">Last 1 year</option>
+                    <option value="all">All</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-10 shrink-0 text-[9px] font-bold uppercase tracking-wide text-ink-400">Folder</span>
+                  <select value={patternScope} onChange={e => setPatternScope(e.target.value as typeof patternScope)}
+                    className="flex-1 rounded border border-ink-200 px-1.5 py-0.5 text-[10px] text-ink-700 focus:border-[#0078d4] focus:outline-none bg-white">
+                    <option value="all">All (Inbox + Sent)</option>
+                    <option value="inbox">Inbox only</option>
+                    <option value="sent">Sent only</option>
+                  </select>
+                </div>
+              </div>
+              <button onClick={generatePatternAnalysis}
+                disabled={patternLoading}
+                className={`mb-0.5 flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-[12px] transition whitespace-nowrap ${
+                  patternLoading
+                    ? "bg-[#deecf9] text-[#0f3460] font-semibold"
+                    : "text-[#0f3460] font-medium hover:bg-white hover:text-black"
+                }`}>
+                <span>Work Pattern Analysis</span>
+                {patternLoading && (
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#0078d4] border-t-transparent shrink-0"/>
+                )}
+              </button>
+              {/* All Task Summary settings + button */}
+              <div className="mt-1 mb-0.5 space-y-1 rounded bg-white border border-ink-200 px-2 py-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-10 shrink-0 text-[9px] font-bold uppercase tracking-wide text-ink-400">Period</span>
+                  <select value={taskDays} onChange={e => setTaskDays(e.target.value as typeof taskDays)}
+                    className="flex-1 rounded border border-ink-200 px-1.5 py-0.5 text-[10px] text-ink-700 focus:border-[#0078d4] focus:outline-none bg-white">
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="180">Last 180 days</option>
+                    <option value="365">Last 1 year</option>
+                    <option value="all">All</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-10 shrink-0 text-[9px] font-bold uppercase tracking-wide text-ink-400">Folder</span>
+                  <select value={taskScope} onChange={e => setTaskScope(e.target.value as typeof taskScope)}
+                    className="flex-1 rounded border border-ink-200 px-1.5 py-0.5 text-[10px] text-ink-700 focus:border-[#0078d4] focus:outline-none bg-white">
+                    <option value="all">All (Inbox + Sent)</option>
+                    <option value="inbox">Inbox only</option>
+                    <option value="sent">Sent only</option>
+                  </select>
+                </div>
+              </div>
+              <button onClick={generateTaskSummary}
+                disabled={taskLoading}
+                className={`mb-0.5 flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-[12px] transition whitespace-nowrap ${
+                  taskLoading
+                    ? "bg-[#deecf9] text-[#0f3460] font-semibold"
+                    : "text-[#0f3460] font-medium hover:bg-white hover:text-black"
+                }`}>
+                <span>All Task Summary</span>
+                {taskLoading && (
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#0078d4] border-t-transparent shrink-0"/>
+                )}
+              </button>
+            </div>
+            <div className="border-t border-ink-200 px-3 py-2">
+              <span className="mono text-[11px] text-ink-400">
+                {msgLoading ? `로딩 중… ${loadingCount}개` : `${messages.length}개`}
+              </span>
+            </div>
+          </aside>
+
+          {/* Message list */}
+          <aside className={`${mobileView === "list" ? "flex" : "hidden"} md:flex w-full md:w-[340px] shrink-0 flex-col border-r border-ink-200 bg-white`}>
+            <div className="flex items-center justify-between border-b border-ink-100 bg-[#f9f9f9] px-3 py-2 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                {/* Mobile back to folders */}
+                <button onClick={() => setMobileView("folders")}
+                  className="md:hidden flex h-7 w-7 items-center justify-center rounded text-[#0078d4] hover:bg-[#deecf9] shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                {/* Select all checkbox */}
+                <input type="checkbox"
+                  title="Select all (Ctrl+A)"
+                  checked={filtered.length > 0 && checkedIds.size === filtered.length}
+                  ref={el => { if (el) el.indeterminate = checkedIds.size > 0 && checkedIds.size < filtered.length; }}
+                  onChange={e => setCheckedIds(e.target.checked ? new Set(filtered.map(m => m.entryId)) : new Set())}
+                  className="h-3.5 w-3.5 shrink-0 rounded accent-[#0078d4] cursor-pointer"/>
+                <span className="text-[13px] font-semibold text-[#3c3c3c] truncate">{isSearching ? "Search" : FOLDER_LABELS[activeFolder]}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Mobile report shortcuts */}
+                <div className="md:hidden flex items-center gap-1">
+                  {(["daily", "weekly", "monthly"] as ReportPeriod[]).map(p => (
+                    <button key={p} onClick={() => generateReport(p)} disabled={reportLoading}
+                      className={`flex h-6 items-center rounded px-2 text-[10px] font-semibold whitespace-nowrap transition ${
+                        reportLoading && reportPeriod === p
+                          ? "bg-[#0f3460] text-white"
+                          : "border border-[#0f3460] text-[#0f3460] hover:bg-[#0f3460] hover:text-white"
+                      } disabled:opacity-40`}>
+                      {reportLoading && reportPeriod === p
+                        ? <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-white border-t-transparent"/>
+                        : p === "daily" ? "D" : p === "weekly" ? "W" : "M"}
+                    </button>
+                  ))}
+                  <button onClick={generatePatternAnalysis} disabled={patternLoading}
+                    title="Work Pattern Analysis"
+                    className={`flex h-6 items-center rounded px-2 text-[10px] font-semibold whitespace-nowrap transition ${
+                      patternLoading ? "bg-[#0f3460] text-white" : "border border-[#0f3460] text-[#0f3460] hover:bg-[#0f3460] hover:text-white"
+                    } disabled:opacity-40`}>
+                    {patternLoading
+                      ? <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-white border-t-transparent"/>
+                      : "P"}
+                  </button>
+                </div>
+                <span className="mono text-[11px] text-ink-400 flex items-center gap-1">
+                  {msgLoading && <span className="h-2 w-2 rounded-full bg-[#0078d4] animate-pulse"/>}
+                  {filtered.length}
+                  {msgLoading && msgCache.current.has(activeFolder) && <span className="text-ink-300">↻</span>}
+                </span>
+              </div>
+            </div>
+            {/* Bulk action bar */}
+            {checkedIds.size > 0 && (
+              <div className="flex shrink-0 items-center gap-2 border-b border-ink-100 bg-[#deecf9] px-3 py-1.5">
+                <input type="checkbox" checked={checkedIds.size === filtered.length}
+                  onChange={e => setCheckedIds(e.target.checked ? new Set(filtered.map(m => m.entryId)) : new Set())}
+                  className="h-3.5 w-3.5 rounded accent-[#0078d4] cursor-pointer"/>
+                <span className="flex-1 text-[12px] font-medium text-[#0f3460]">{checkedIds.size} selected</span>
+                <button onClick={() => bulkDelete(Array.from(checkedIds))} disabled={bulkDeleting}
+                  className="flex items-center gap-1 rounded bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50 whitespace-nowrap">
+                  {bulkDeleting
+                    ? <><span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-white border-t-transparent"/>Deleting…</>
+                    : <>Delete {checkedIds.size}</>}
+                </button>
+                <button onClick={() => setCheckedIds(new Set())}
+                  className="rounded px-2 py-1 text-[11px] text-ink-500 hover:bg-ink-100 whitespace-nowrap">
+                  Cancel
+                </button>
+              </div>
+            )}
+            {!msgLoading && msgError && (
+              <div className="p-4 text-center">
+                <p className="text-[12px] text-red-600 whitespace-pre-wrap break-all">{msgError}</p>
+                <button onClick={() => loadMessages()} className="mt-2 rounded bg-[#0078d4] px-3 py-1.5 text-[12px] text-white whitespace-nowrap">Retry</button>
+              </div>
+            )}
+            <div className="flex-1 overflow-y-auto">
+              {filtered.map(msg => (
+                <div key={msg.entryId} className="relative group">
+                <button
+                  onClick={() => { setCheckedIds(prev => { if (prev.size > 0) { const next = new Set(prev); next.has(msg.entryId) ? next.delete(msg.entryId) : next.add(msg.entryId); return next; } return prev; }); selectMessage(msg); }}
+                  onMouseEnter={() => prefetchThread(msg)}
+                  onDoubleClick={e => { e.preventDefault(); toggleImportant(msg); }}
+                  className={`w-full border-b border-ink-50 pl-8 pr-3 py-2.5 text-left hover:bg-[#f3f6fb] transition ${
+                    selected?.entryId === msg.entryId ? "border-l-2 border-l-[#0078d4] bg-[#deecf9]" : "border-l-2 border-l-transparent"
+                  } ${isTagged(msg) ? "border-l-2 !border-l-blue-400" : ""}`}>
+                  <div className="flex items-start gap-1.5">
+                    <div className="mt-1.5 h-2 w-2 shrink-0">
+                      {isTagged(msg)
+                        ? <div className="h-2 w-2 rounded-full bg-blue-500"/>
+                        : msg.isUnread && <div className="h-2 w-2 rounded-full bg-[#0078d4]"/>}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={`truncate text-[13px] ${msg.isUnread ? "font-semibold text-black" : "text-[#3c3c3c]"}`}>
+                          {msg.senderName || msg.senderEmail}
+                        </span>
+                        <span className="mono shrink-0 text-[11px] text-ink-400">{formatTime(msg.receivedTime)}</span>
+                      </div>
+                      <div className={`mt-0.5 truncate text-[12px] ${msg.isUnread ? "font-medium text-black" : "text-[#3c3c3c]"}`}>
+                        {msg.subject}
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between">
+                        <span className="truncate text-[11px] text-black">{msg.preview}</span>
+                        <div className="ml-1 flex shrink-0 items-center gap-1">
+                          {isSearching && searchFolderMap && (
+                            <span className="rounded bg-ink-100 px-1 py-0.5 text-[10px] text-ink-500 shrink-0">
+                              {FOLDER_LABELS[searchFolderMap.get(msg.entryId.toUpperCase()) ?? "inbox"]}
+                            </span>
+                          )}
+                          {msg.attachmentCount > 0 && <span className="text-[11px] text-ink-400">📎</span>}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={e => { e.stopPropagation(); deleteMessage(msg); }}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                deleteMessage(msg);
+                              }
+                            }}
+                            title="삭제"
+                            className="rounded px-1 text-[11px] text-ink-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"
+                          >
+                            🗑
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+                {/* Checkbox overlay */}
+                <label onClick={e => e.stopPropagation()}
+                  className="absolute left-0 top-0 flex h-full w-8 cursor-pointer items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <input type="checkbox"
+                    checked={checkedIds.has(msg.entryId)}
+                    onChange={e => {
+                      e.stopPropagation();
+                      setCheckedIds(prev => {
+                        const next = new Set(prev);
+                        e.target.checked ? next.add(msg.entryId) : next.delete(msg.entryId);
+                        return next;
+                      });
+                    }}
+                    className="h-3.5 w-3.5 rounded accent-[#0078d4] cursor-pointer"/>
+                </label>
+                </div>
+              ))}
+              {msgLoading && (
+                <div className="flex items-center justify-center gap-2 py-3 text-[12px] text-ink-400">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#0078d4] border-t-transparent"/>
+                  {loadingCount > 0 ? `${loadingCount} loaded…` : "Loading from Outlook…"}
+                </div>
+              )}
+              {!msgLoading && filtered.length === 0 && !msgError && (
+                <div className="p-8 text-center text-[13px] text-ink-400">No emails</div>
+              )}
+            </div>
+          </aside>
+
+          {/* Reading pane */}
+          <main className={`${mobileView === "reading" ? "flex" : "hidden"} md:flex min-w-0 flex-1 flex-col bg-white`}>
+            {!selected ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-ink-300">
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" className="opacity-30">
+                  <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M2 8l10 6 10-6" stroke="currentColor" strokeWidth="1.5"/>
+                </svg>
+                <span className="text-[14px]">Select a mail</span>
+              </div>
+            ) : (
+              <>
+                <div className="shrink-0 border-b border-ink-100 px-3 md:px-5 py-2 md:py-3">
+                  {/* ── Mobile icon bar (single row) ─────────────────────── */}
+                  <div className="flex md:hidden items-center justify-between gap-1">
+                    <div className="flex items-center gap-0.5">
+                      {/* Back */}
+                      <button onClick={() => setMobileView("list")} title="목록"
+                        className="flex h-9 w-9 items-center justify-center rounded text-ink-500 hover:bg-ink-100 active:bg-ink-200">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                      <div className="w-px h-5 bg-ink-200 mx-0.5"/>
+                      {/* Reply */}
+                      <button onClick={() => quickOutlookAction("reply")} title="회신" disabled={!selected}
+                        className="flex h-9 w-9 items-center justify-center rounded text-[#0078d4] hover:bg-[#deecf9] active:bg-[#c7e0f4] disabled:opacity-30 disabled:cursor-not-allowed">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 17l-5-5 5-5M4 12h11a5 5 0 010 10H11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                      {/* Reply All */}
+                      <button onClick={() => quickOutlookAction("replyAll")} title="전체 회신" disabled={!selected}
+                        className="flex h-9 w-9 items-center justify-center rounded text-[#0078d4] hover:bg-[#deecf9] active:bg-[#c7e0f4] disabled:opacity-30 disabled:cursor-not-allowed">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M7 17l-5-5 5-5M2 12h11a5 5 0 010 10H9M13 17l-5-5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                      {/* Forward */}
+                      <button onClick={() => quickOutlookAction("forward")} title="전달" disabled={!selected}
+                        className="flex h-9 w-9 items-center justify-center rounded text-[#107c10] hover:bg-[#e6f4e6] active:bg-[#cceacc] disabled:opacity-30 disabled:cursor-not-allowed">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 000 10h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                      {/* Delete */}
+                      <button onClick={() => selected && deleteMessage(selected)} title="삭제" disabled={!selected}
+                        className="flex h-9 w-9 items-center justify-center rounded text-red-500 hover:bg-red-50 active:bg-red-100 disabled:opacity-30 disabled:cursor-not-allowed">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      {/* Open in Outlook */}
+                      <button onClick={() => openRecipientModal(false)} title="Outlook에서 열기" disabled={!draft}
+                        className="flex h-9 w-9 items-center justify-center rounded text-[#0f3460] hover:bg-[#e8eef7] active:bg-[#d0ddf0] disabled:opacity-30 disabled:cursor-not-allowed">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 17l-5-5 5-5M20 18v-2a4 4 0 00-4-4H4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                      {/* Send now */}
+                      <button onClick={() => openRecipientModal(true)} title="바로 발송" disabled={!draft}
+                        className={`flex h-9 w-9 items-center justify-center rounded transition disabled:opacity-30 disabled:cursor-not-allowed ${draft ? "bg-[#0f3460] text-white hover:bg-[#0a2342]" : "text-ink-300"}`}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                      <div className="w-px h-5 bg-ink-200 mx-0.5"/>
+                      {/* AI toggle */}
+                      <button onClick={() => setMobileView(v => v === "ai" ? "reading" : "ai")} title="AI Draft"
+                        className={`flex h-9 w-9 items-center justify-center rounded text-[11px] font-bold transition ${mobileView === "ai" ? "bg-[#0f3460] text-white" : "border border-ink-200 text-[#0f3460] hover:bg-[#0f3460] hover:text-white"}`}>
+                        AI
+                      </button>
+                    </div>
+                  </div>
+                  {replyStatus && (
+                    <div className="md:hidden mt-1 text-[11px] font-medium text-center" style={{ color: replyStatus.startsWith("✓") ? "#16a34a" : replyStatus.includes("중") ? "#9ca3af" : "#dc2626" }}>
+                      {replyStatus}
+                    </div>
+                  )}
+                  {/* Mobile prev/next + divider */}
+                  <div className="md:hidden flex items-center justify-between mt-2 mb-1">
+                    <div className="flex items-center gap-1">
+                      {(() => {
+                        const idx = filtered.findIndex(m => m.entryId === selected.entryId);
+                        const prev = idx > 0 ? filtered[idx - 1] : null;
+                        const next = idx < filtered.length - 1 ? filtered[idx + 1] : null;
+                        return (
+                          <>
+                            <button onClick={() => prev && selectMessage(prev)} disabled={!prev}
+                              className="flex h-7 items-center gap-1 rounded border border-ink-200 px-2 text-[11px] text-ink-600 hover:border-[#0078d4] hover:text-[#0078d4] disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              Prev
+                            </button>
+                            <span className="text-[10px] text-ink-400 px-1">{idx + 1}/{filtered.length}</span>
+                            <button onClick={() => next && selectMessage(next)} disabled={!next}
+                              className="flex h-7 items-center gap-1 rounded border border-ink-200 px-2 text-[11px] text-ink-600 hover:border-[#0078d4] hover:text-[#0078d4] disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap">
+                              Next
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <hr className="md:hidden border-t border-ink-100 mb-2"/>
+
+                  {/* ── Desktop text button bar ──────────────────────────── */}
+                  <div className="hidden md:flex mb-2 flex-wrap items-center gap-2">
+                    <button onClick={() => quickOutlookAction("reply")} disabled={!selected}
+                      className="flex items-center gap-1.5 rounded border border-[#0078d4] bg-white px-3 py-1.5 text-[12px] font-medium text-[#0078d4] hover:bg-[#deecf9] disabled:border-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed transition whitespace-nowrap">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 17l-5-5 5-5M4 12h11a5 5 0 010 10H11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Reply
+                    </button>
+                    <button onClick={() => quickOutlookAction("replyAll")} disabled={!selected}
+                      className="flex items-center gap-1.5 rounded border border-[#0078d4] bg-white px-3 py-1.5 text-[12px] font-medium text-[#0078d4] hover:bg-[#deecf9] disabled:border-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed transition whitespace-nowrap">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M7 17l-5-5 5-5M2 12h11a5 5 0 010 10H9M13 17l-5-5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Reply All
+                    </button>
+                    <button onClick={() => quickOutlookAction("forward")} disabled={!selected}
+                      className="flex items-center gap-1.5 rounded border border-[#107c10] bg-white px-3 py-1.5 text-[12px] font-medium text-[#107c10] hover:bg-[#e6f4e6] disabled:border-ink-200 disabled:text-ink-400 disabled:cursor-not-allowed transition whitespace-nowrap">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 000 10h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Forward
+                    </button>
+                    <div className="h-5 w-px bg-ink-200"/>
+                    <button onClick={() => selected && deleteMessage(selected)} disabled={!selected}
+                      className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${selected ? "border-red-200 bg-white text-red-700 hover:bg-red-50" : "border-ink-200 text-ink-400 cursor-not-allowed"}`}>
+                      Delete
+                    </button>
+                    <div className="flex-1"/>
+                    {replyStatus && (
+                      <span className={`text-[11px] font-medium ${replyStatus.startsWith("✓") ? "text-green-600" : replyStatus.includes("중") ? "text-ink-400" : "text-red-500"}`}>
+                        {replyStatus}
+                      </span>
+                    )}
+                    <button onClick={() => openRecipientModal(false)} disabled={!draft}
+                      className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${draft ? "border-[#0f3460] bg-white text-[#0f3460] hover:bg-[#0f3460] hover:text-white" : "border-ink-200 text-ink-400 cursor-not-allowed"}`}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 17l-5-5 5-5M20 18v-2a4 4 0 00-4-4H4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Open in Outlook
+                    </button>
+                    <button onClick={() => openRecipientModal(true)} disabled={!draft}
+                      className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${draft ? "border-[#0f3460] bg-[#0f3460] text-white hover:bg-[#0a2342]" : "border-ink-200 bg-ink-100 text-ink-400 cursor-not-allowed"}`}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Send Now
+                    </button>
+                    <div className="flex-1"/>
+                    <button onClick={() => setAiOpen(o => !o)}
+                      className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${aiOpen ? "border-[#0f3460] bg-[#0f3460] text-white" : "border-ink-200 bg-white text-ink-600 hover:border-[#0f3460] hover:text-[#0f3460]"}`}>
+                      AI Draft
+                    </button>
+                  </div>
+                  <h1 className="text-[17px] font-semibold leading-snug">{selected.subject}</h1>
+                  <div className="mt-2 flex items-start gap-2.5">
+                    <Avatar name={selected.senderName || selected.senderEmail}/>
+                    <div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-medium text-[13px]">{selected.senderName}</span>
+                        <span className="text-[12px] text-ink-500">&lt;{selected.senderEmail}&gt;</span>
+                      </div>
+                      <div className="text-[12px] text-ink-400">{formatDate(selected.receivedTime)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {threadLoading ? (
+                  <div className="flex flex-1 items-center justify-center">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#0078d4] border-t-transparent"/>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto divide-y divide-ink-100">
+                    {thread.length === 0 ? (
+                      <div className="p-6 text-center text-[13px] text-ink-400">대화 내용 없음</div>
+                    ) : thread.map((msg, idx) => {
+                      const isMine = senderEmail && msg.senderEmail &&
+                        msg.senderEmail.toLowerCase().trim() === senderEmail.toLowerCase().trim();
+                      return (
+                      <div key={`${msg.entryId}-${idx}`} className="bg-white">
+                        <div className={`flex items-start gap-2.5 px-5 py-2.5 ${isMine ? "bg-[#eef4ff]" : "bg-[#f9f9f9]"}`}>
+                          <Avatar name={isMine ? "나" : (msg.senderName || msg.senderEmail)}/>
+                          <div className="min-w-0 flex-1">
+                            {/* 날짜 + 발신자 */}
+                            <div className="flex items-baseline justify-between gap-2">
+                              <div className="flex items-baseline gap-1.5 min-w-0">
+                                <span className="shrink-0 text-[10px] font-medium text-ink-400">보낸사람</span>
+                                {isMine ? (
+                                  <span className="font-semibold text-[12px] text-[#0078d4] truncate">나</span>
+                                ) : (
+                                  <span className="font-semibold text-[12px] truncate">{msg.senderName}</span>
+                                )}
+                                <span className="text-[11px] text-ink-500 truncate">&lt;{msg.senderEmail}&gt;</span>
+                              </div>
+                              <span className="mono shrink-0 text-[11px] text-ink-400">{formatDate(msg.sentOn)}</span>
+                            </div>
+                            {/* 받는사람 */}
+                            {msg.recipients.filter(r => r.rtype === 1).length > 0 && (
+                              <div className="mt-0.5 flex items-baseline gap-1.5 min-w-0">
+                                <span className="shrink-0 text-[10px] font-medium text-ink-400">받는사람</span>
+                                <span className="text-[11px] text-ink-600 truncate">
+                                  {msg.recipients.filter(r => r.rtype === 1).map(r => r.name || r.email).join(", ")}
+                                </span>
+                              </div>
+                            )}
+                            {/* 참조 */}
+                            {msg.recipients.filter(r => r.rtype === 2).length > 0 && (
+                              <div className="mt-0.5 flex items-baseline gap-1.5 min-w-0">
+                                <span className="shrink-0 text-[10px] font-medium text-ink-400">참조</span>
+                                <span className="text-[11px] text-ink-500 truncate">
+                                  {msg.recipients.filter(r => r.rtype === 2).map(r => r.name || r.email).join(", ")}
+                                </span>
+                              </div>
+                            )}
+                            {msg.attachments.length > 0 && (
+                              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                {msg.attachments.map((att, ai) => (
+                                  <button key={ai} onClick={() => downloadAtt(msg.entryId, att.name)}
+                                    className="flex items-center gap-1 rounded border border-ink-200 bg-white px-2 py-0.5 text-[11px] text-ink-700 hover:border-[#0078d4] hover:text-[#0078d4] transition">
+                                    {fileIcon(att.name)}
+                                    <span className="max-w-[180px] truncate">{att.name}</span>
+                                    <span className="text-ink-400">({formatSize(att.size)})</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ overflowX: "auto", overflowY: "hidden" }}>
+                          <iframe
+                            srcDoc={(() => {
+                              const fontCss = `@import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');*,*::before,*::after,body,p,span,div,td,th,li,a,font,b,i,em,strong,h1,h2,h3,h4,h5,h6{font-family:'Gowun Dodum','고운돋움','Goun Dotum','Dotum',Arial,sans-serif!important;font-size:11px!important;line-height:1.65!important;}html,body{overflow:visible!important;margin:0!important;}`;
+                              if (msg.htmlBody) return `<style>${fontCss}</style>` + msg.htmlBody;
+                              return `<html><head><style>${fontCss}body{color:#1a1a1a;padding:12px 18px;white-space:pre-wrap}</style></head><body>${
+                                (msg.body || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+                              }</body></html>`;
+                            })()}
+                            sandbox="allow-scripts allow-same-origin allow-popups"
+                            className="border-none"
+                            style={{
+                              height: iframeH[idx] ?? 300,
+                              width: iframeW[idx] ? `${iframeW[idx]}px` : "100%",
+                              minWidth: "100%",
+                              display: "block",
+                            }}
+                            onLoad={e => {
+                              const frame = e.currentTarget;
+                              const measure = () => {
+                                try {
+                                  const doc = frame.contentDocument;
+                                  const h = Math.max(
+                                    doc?.documentElement?.scrollHeight ?? 0,
+                                    doc?.body?.scrollHeight ?? 0,
+                                    120
+                                  ) + 50;
+                                  const w = Math.max(
+                                    doc?.documentElement?.scrollWidth ?? 0,
+                                    doc?.body?.scrollWidth ?? 0,
+                                    0
+                                  );
+                                  setIframeH(prev => ({ ...prev, [idx]: h }));
+                                  if (w > frame.offsetWidth + 4) {
+                                    setIframeW(prev => ({ ...prev, [idx]: w }));
+                                  }
+                                } catch {}
+                              };
+                              measure();
+                              setTimeout(measure, 600);
+                            }}
+                            title={`메시지 from ${msg.senderName}`}
+                          />
+                        </div>
+                      </div>
+                    );})}
+                  </div>
+                )}
+
+              </>
+            )}
+          </main>
+
+          {/* AI panel — desktop: side panel when aiOpen; mobile: full-width pane when mobileView==="ai" */}
+          {(aiOpen || mobileView === "ai") && (
+            <aside className={`${
+              mobileView === "ai" ? "flex w-full" : "hidden"
+            } md:flex md:w-[330px] shrink-0 flex-col border-l border-ink-200 bg-[#f9f9f9]`}>
+              <div className="flex shrink-0 items-center justify-between border-b border-ink-200 bg-[#f3f6fb] px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  {/* Mobile: back to reading pane */}
+                  <button onClick={() => setMobileView("reading")}
+                    className="md:hidden flex items-center gap-1.5 rounded border border-ink-200 px-2.5 py-1 text-[12px] font-medium text-ink-600 hover:bg-ink-100 active:bg-ink-200">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    메일
+                  </button>
+                  <span className="text-[13px] font-semibold text-[#3c3c3c]">AI Draft</span>
+                </div>
+                <button onClick={() => { setAiOpen(false); setMobileView("reading"); }} className="text-ink-400 hover:text-black text-[18px] leading-none">×</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* 보내는 사람 */}
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="text-[12px] font-semibold text-ink-600">From</p>
+                    <button
+                      onClick={() => {
+                        const next = !senderLocked;
+                        setSenderLocked(next);
+                        localStorage.setItem("ae_sender_locked", String(next));
+                        if (next) {
+                          localStorage.setItem("ae_sender_name",  senderName);
+                          localStorage.setItem("ae_sender_email", senderEmail);
+                        } else {
+                          localStorage.removeItem("ae_sender_name");
+                          localStorage.removeItem("ae_sender_email");
+                          localStorage.setItem("ae_sender_locked", "false");
+                        }
+                      }}
+                      className={`rounded border px-2 py-0.5 text-[11px] font-medium transition ${
+                        senderLocked
+                          ? "border-[#0f3460] bg-[#0f3460] text-white"
+                          : "border-ink-200 text-ink-500 hover:border-[#0f3460] hover:text-[#0f3460]"
+                      }`}>
+                      {senderLocked ? "Pinned" : "Pin"}
+                    </button>
+                  </div>
+                  <input value={senderName}
+                    onChange={e => { setSenderName(e.target.value); if (senderLocked) localStorage.setItem("ae_sender_name", e.target.value); }}
+                    placeholder="Name"
+                    className="mb-1 w-full rounded border border-ink-200 px-2.5 py-1.5 text-[12px] focus:border-[#0f3460] focus:outline-none"/>
+                  <input value={senderEmail}
+                    onChange={e => { setSenderEmail(e.target.value); if (senderLocked) localStorage.setItem("ae_sender_email", e.target.value); }}
+                    placeholder="Email"
+                    className="w-full rounded border border-ink-200 px-2.5 py-1.5 text-[12px] focus:border-[#0f3460] focus:outline-none"/>
+                </div>
+
+                {/* 메일 목적 */}
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="text-[12px] font-semibold text-ink-600">Purpose / Request</p>
+                    <button
+                      onClick={() => setPurpose("")}
+                      disabled={!purpose}
+                      className={`rounded border px-2 py-0.5 text-[11px] font-medium transition ${
+                        purpose
+                          ? "border-[#0f3460] bg-[#0f3460] text-white hover:bg-[#0a2342]"
+                          : "border-ink-200 text-ink-300 cursor-not-allowed"
+                      }`}>
+                      Clear
+                    </button>
+                  </div>
+                  <textarea value={purpose} onChange={e => setPurpose(e.target.value)}
+                    placeholder="e.g. Delivery schedule inquiry, quote request, technical Q&A reply"
+                    rows={3}
+                    className="mono w-full rounded border border-ink-200 bg-white px-2.5 py-2 text-[12px] focus:border-[#0f3460] focus:outline-none resize-none"/>
+                </div>
+
+                {/* 글자 수 제한 */}
+                <div>
+                  <p className="mb-1.5 text-[12px] font-semibold text-ink-600">Char Limit <span className="font-normal text-ink-400">(incl. spaces)</span></p>
+                  <div className="flex gap-1.5">
+                    <select
+                      value={charLimitSel}
+                      onChange={e => { setCharLimitSel(e.target.value); setCharLimitCustom(""); }}
+                      className="flex-1 rounded border border-ink-200 bg-white px-2 py-1.5 text-[12px] focus:border-[#0f3460] focus:outline-none">
+                      {["No Limit", "200", "300", "500", "800", "1000", "1500", "2000", "Custom"].map(v => (
+                        <option key={v} value={v}>{v === "No Limit" || v === "Custom" ? v : `${v} chars`}</option>
+                      ))}
+                    </select>
+                    {charLimitSel === "Custom" && (
+                      <input
+                        type="number"
+                        min={50}
+                        value={charLimitCustom}
+                        onChange={e => setCharLimitCustom(e.target.value)}
+                        placeholder="chars"
+                        className="w-24 rounded border border-ink-200 bg-white px-2 py-1.5 text-[12px] focus:border-[#0f3460] focus:outline-none"
+                      />
+                    )}
+                  </div>
+                  {charLimitSel !== "No Limit" && (
+                    <p className="mt-0.5 text-[11px] text-ink-400">
+                      Target: within {charLimitSel === "Custom" ? (charLimitCustom ? `${charLimitCustom} chars` : "—") : `${charLimitSel} chars`}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="mb-2 text-[12px] font-semibold text-ink-600">Tone</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(["neutral","positive","negative","custom"] as Tone[]).map(t => (
+                      <button key={t} onClick={() => setTone(t)}
+                        className={`rounded border py-2 text-[12px] font-medium transition ${
+                          tone===t
+                            ? "border-[#0f3460] bg-[#0f3460] text-white font-semibold"
+                            : "border-ink-200 bg-white text-ink-600 hover:border-[#0f3460] hover:text-[#0f3460]"
+                        }`}>
+                        {TONE_LABELS[t]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {tone === "custom" && (
+                  <div>
+                    <p className="mb-1 text-[12px] font-semibold text-ink-600">Tone Instruction</p>
+                    <textarea value={customNote} onChange={e => setCustomNote(e.target.value)}
+                      placeholder="e.g. Apologize for delivery delay and propose alternatives" rows={2}
+                      className="mono w-full rounded border border-ink-200 bg-white px-2.5 py-2 text-[12px] focus:border-[#0f3460] focus:outline-none resize-none"/>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <button onClick={openAiRecipModal} disabled={!selected || thread.length===0 || draftLoading}
+                    className={`flex-1 rounded py-2.5 text-[13px] font-semibold transition ${
+                      !selected||thread.length===0||draftLoading
+                        ? "cursor-not-allowed bg-ink-100 text-ink-400"
+                        : "bg-[#0f3460] text-white hover:bg-[#0a2342]"
+                    }`}>
+                    {draftLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"/>
+                        Generating…
+                      </span>
+                    ) : "Generate Draft"}
+                  </button>
+                  {/* 표 형식 토글 */}
+                  <button
+                    onClick={() => setTableMode(p => !p)}
+                    title={tableMode ? "Table ON — click to disable" : "Table OFF — click to enable"}
+                    className={`flex shrink-0 items-center gap-1 rounded border px-2 py-2.5 text-[12px] font-semibold transition ${
+                      tableMode
+                        ? "border-[#0f7455] bg-[#0f7455] text-white"
+                        : "border-ink-200 bg-white text-ink-500 hover:border-[#0f7455] hover:text-[#0f7455]"
+                    }`}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.7"/>
+                      <path d="M3 9h18M3 15h18M9 3v18M15 3v18" stroke="currentColor" strokeWidth="1.5"/>
+                    </svg>
+                  </button>
+                </div>
+                {draftError && (
+                  <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">{draftError}</div>
+                )}
+                {draft ? (
+                  <>
+                    <div>
+                      <div className="mb-1 flex items-center justify-between">
+                        <p className="text-[12px] font-semibold text-ink-600">Draft (editable)</p>
+                        <div className="flex items-center gap-1.5">
+                          {draftPreview && (
+                            <button
+                              onClick={async () => {
+                                const plain = draft.replace(/\|.*\|[\s\S]*?(?=\n\n|\n[^|]|$)/g, m => {
+                                  const rows = m.split("\n").filter(r => r.trim() && !/^\|[\s\-|:]+\|$/.test(r.trim()));
+                                  return rows.map(r => r.split("|").slice(1,-1).map(c=>c.trim()).join("\t")).join("\n");
+                                });
+                                try {
+                                  await navigator.clipboard.writeText(plain);
+                                } catch {
+                                  await navigator.clipboard.writeText(draft);
+                                }
+                                setDraftCopied(true);
+                                setTimeout(() => setDraftCopied(false), 2000);
+                              }}
+                              className="rounded border border-ink-200 bg-white px-2 py-0.5 text-[11px] text-ink-500 hover:border-[#0f3460] hover:text-[#0f3460] transition">
+                              {draftCopied ? "Copied" : "Copy"}
+                            </button>
+                          )}
+                          <div className="flex rounded border border-ink-200 overflow-hidden text-[11px]">
+                            <button
+                              onClick={() => setDraftPreview(false)}
+                              className={`px-2 py-0.5 transition ${!draftPreview ? "bg-[#0f3460] text-white" : "bg-white text-ink-500 hover:bg-ink-50"}`}>
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setDraftPreview(true)}
+                              className={`px-2 py-0.5 transition ${draftPreview ? "bg-[#0f3460] text-white" : "bg-white text-ink-500 hover:bg-ink-50"}`}>
+                              Preview
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {draftPreview ? (
+                        <iframe
+                          srcDoc={`<html><head><style>html,body{margin:0;overflow-x:hidden;overflow-y:auto}body{font-family:Calibri,Arial,sans-serif;font-size:12px;line-height:1.6;color:#1a1a1a;padding:8px 10px;white-space:pre-wrap}</style></head><body>${draftToHtml(draft)}</body></html>`}
+                          sandbox="allow-same-origin"
+                          className="w-full rounded border border-ink-200 bg-white"
+                          style={{ height: 280 }}
+                          title="초안 미리보기"
+                        />
+                      ) : (
+                        <textarea value={draft} onChange={e => setDraft(e.target.value)}
+                          className="mono w-full rounded border border-ink-200 bg-white px-2.5 py-2 text-[12px] leading-relaxed focus:border-[#0f3460] focus:outline-none resize-none overflow-y-auto"
+                          style={{ height: 280 }}/>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => executeReply(aiTo, aiCc, false)}
+                        className="flex-1 rounded border border-[#0f3460] py-2 text-[12px] font-semibold text-[#0f3460] hover:bg-[#0f3460] hover:text-white transition">
+                        Outlook에서 열기
+                      </button>
+                      <button onClick={() => executeReply(aiTo, aiCc, true)}
+                        className="flex-1 rounded bg-[#0f3460] py-2 text-[12px] font-semibold text-white hover:bg-[#0a2342] transition">
+                        Send Now
+                      </button>
+                    </div>
+                    {replyStatus && (
+                      <p className={`text-[12px] ${replyStatus.startsWith("✓") ? "text-green-600" : "text-ink-600"}`}>{replyStatus}</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="rounded border border-ink-100 bg-white p-4 text-center text-[12px] text-ink-400">
+                    {!selected ? "Select an email first" : thread.length===0 ? "Loading thread…" : "Select tone and click Generate Draft"}
+                  </div>
+                )}
+
+                {/* ── Summarize 섹션 ────────────────────────────── */}
+                <div className="border-t border-ink-200 pt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-semibold text-ink-700">Summarize</span>
+                    <button
+                      onClick={generateSummary}
+                      disabled={!selected || threadLoading || summaryLoading}
+                      className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-[12px] font-semibold transition ${
+                        !selected || threadLoading || summaryLoading
+                          ? "cursor-not-allowed bg-ink-100 text-ink-400"
+                          : "bg-[#0f3460] text-white hover:bg-[#0a2342]"
+                      }`}>
+                      {summaryLoading ? (
+                        <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent inline-block"/>Summarizing…</>
+                      ) : (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6M9 16h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          Summarize
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {summaryError && (
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">{summaryError}</div>
+                  )}
+                  {!summaryLoading && !summaryError && (
+                    <div className="rounded border border-ink-100 bg-white p-3 text-center text-[11px] text-ink-400">
+                      {!selected ? "Select an email first" : thread.length === 0 ? "Loading thread…" : "Click Summarize to extract key points"}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── 한국어 번역 섹션 ─────────────────────────── */}
+                <div className="border-t border-ink-200 pt-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-semibold text-ink-700">Translate</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => { setTransResult(""); setTransError(null); }}
+                        disabled={!transResult && !transError}
+                        className={`rounded px-3 py-1.5 text-[12px] font-semibold transition ${
+                          !transResult && !transError
+                            ? "cursor-not-allowed bg-ink-100 text-ink-400"
+                            : "bg-[#0f3460] text-white hover:bg-[#0a2342]"
+                        }`}>
+                        Clear
+                      </button>
+                      <button
+                        onClick={translateThread}
+                        disabled={!selected || thread.length === 0 || transLoading}
+                        className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-[12px] font-semibold transition ${
+                          !selected || thread.length === 0 || transLoading
+                            ? "cursor-not-allowed bg-ink-100 text-ink-400"
+                            : "bg-[#0f3460] text-white hover:bg-[#0a2342]"
+                        }`}>
+                        {transLoading ? (
+                          <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent inline-block"/>Translating…</>
+                        ) : "Translate"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-ink-500 shrink-0">Language</span>
+                    <select value={transLang} onChange={e => { setTransLang(e.target.value); setTransResult(""); }}
+                      className="flex-1 rounded border border-ink-200 px-2 py-1 text-[12px] focus:border-[#0f3460] focus:outline-none bg-white">
+                      {["Korean","English","Chinese (Simplified)","Chinese (Traditional)","Japanese","German","French","Spanish","Vietnamese","Thai","Indonesian","Russian","Arabic"].map(l => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {transError && (
+                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600">{transError}</div>
+                  )}
+                  {transResult ? (
+                    <iframe
+                      srcDoc={transDoc}
+                      sandbox="allow-scripts allow-same-origin"
+                      className="w-full rounded border border-ink-200"
+                      style={{ height: transIframeH }}
+                      onLoad={e => {
+                        const frame = e.currentTarget;
+                        const measure = () => {
+                          try {
+                            const doc = frame.contentDocument;
+                            const h = Math.max(doc?.documentElement?.scrollHeight ?? 0, doc?.body?.scrollHeight ?? 0, 80) + 20;
+                            setTransIframeH(h);
+                          } catch {}
+                        };
+                        measure();
+                        setTimeout(measure, 500);
+                      }}
+                    />
+                  ) : (
+                    !transLoading && (
+                      <div className="rounded border border-ink-100 bg-white p-3 text-center text-[11px] text-ink-400">
+                        {!selected ? "Select an email first" : "Click Translate to convert"}
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            </aside>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

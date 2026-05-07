@@ -1,0 +1,21 @@
+# Next.js
+app/.next/
+app/out/
+app/node_modules/
+app/.env.local
+app/.env.*.local
+
+# Python
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/.venv/
+backend/venv/
+backend/.env
+
+# General
+.DS_Store
+*.log
+.idea/
+.vscode/settings.json
+*.pem

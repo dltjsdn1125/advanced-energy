@@ -1,0 +1,5456 @@
+{
+ "meta": {
+  "tableCount": 48,
+  "totalRows": 441
+ },
+ "tables": [
+  {
+   "page": 19,
+   "section": "LCC250 Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "FANLESS/CONDUCTION COOLED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number",
+    "Output",
+    "Adjustment Range",
+    "Output Current (Min)",
+    "Max",
+    "Output Ripple P/P1",
+    "Combined Line/ Load Regulation"
+   ],
+   "rows": [
+    [
+     "LCC250-12U-4P",
+     "12 V",
+     "±10%",
+     "0 A",
+     "20.8 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-12U-4PE3",
+     "12 V",
+     "±10%",
+     "0 A",
+     "20.8 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-12U-7P",
+     "12 V",
+     "±10%",
+     "0 A",
+     "20.8 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-12U-7PE3",
+     "12 V",
+     "±10%",
+     "0 A",
+     "20.8 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-24U-4P",
+     "24 V",
+     "+14.6/-15%",
+     "0 A",
+     "10.4 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-24U-4PE3",
+     "24 V",
+     "+14.6/-15%",
+     "0 A",
+     "10.4 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-24U-7P",
+     "24 V",
+     "+14.6/-15%",
+     "0 A",
+     "10.4 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-24U-7PE3",
+     "24 V",
+     "+14.6/-15%",
+     "0 A",
+     "10.4 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-48U-4P",
+     "48 V",
+     "±15%",
+     "0 A",
+     "5.2 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-48U-4PE3",
+     "48 V",
+     "±15%",
+     "0 A",
+     "5.2 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-48U-7P",
+     "48 V",
+     "±15%",
+     "0 A",
+     "5.2 A",
+     "1%",
+     "±2%"
+    ],
+    [
+     "LCC250-48U-7PE3",
+     "48 V",
+     "±15%",
+     "0 A",
+     "5.2 A",
+     "1%",
+     "±2%"
+    ]
+   ],
+   "partNumbers": [
+    "LCC250-12U-4P",
+    "LCC250-12U-4PE3",
+    "LCC250-12U-7P",
+    "LCC250-12U-7PE3",
+    "LCC250-24U-4P",
+    "LCC250-24U-4PE3",
+    "LCC250-24U-7P",
+    "LCC250-24U-7PE3",
+    "LCC250-48U-4P",
+    "LCC250-48U-4PE3",
+    "LCC250-48U-7P",
+    "LCC250-48U-7PE3"
+   ]
+  },
+  {
+   "page": 21,
+   "section": "LCC600 Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "FANLESS/CONDUCTION COOLED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number1",
+    "AC Input",
+    "Output Setpoint (V)",
+    "Setpoint Tolerance",
+    "Adjustment Range",
+    "Output Current [A] (Min)",
+    "Max",
+    "Max O/P (Power [W])",
+    "Typical Efficiency2",
+    "Standby Output",
+    "Combined Line/Load Regulation",
+    "Output Ripple"
+   ],
+   "rows": [
+    [
+     "LCC600-48U-9P",
+     "90 to 264",
+     "48",
+     "±0.5%",
+     "44 to 54",
+     "0",
+     "12.5",
+     "600",
+     "93%",
+     "5 VDC @ 1.5 A",
+     "2%",
+     "1%"
+    ],
+    [
+     "LCC600-48H-9P",
+     "180 to 305",
+     "48",
+     "±0.5%",
+     "44 to 54",
+     "0",
+     "12.5",
+     "600",
+     "93%",
+     "5 VDC @ 1.5 A",
+     "2%",
+     "1%"
+    ],
+    [
+     "LCC600-36U-9P",
+     "90 to 264",
+     "36",
+     "±0.5%",
+     "32 to 38",
+     "0",
+     "16.7",
+     "600",
+     "92%",
+     "5 VDC @ 1.5 A",
+     "2%",
+     "1%"
+    ],
+    [
+     "LCC600-36H-9P",
+     "180 to 305",
+     "36",
+     "±0.5%",
+     "32 to 38",
+     "0",
+     "16.7",
+     "600",
+     "92%",
+     "5 VDC @ 1.5 A",
+     "2%",
+     "1%"
+    ],
+    [
+     "LCC600-28U-9P",
+     "90 to 264",
+     "28",
+     "±0.5%",
+     "24 to 30",
+     "0",
+     "25",
+     "600",
+     "93.5%",
+     "5 VDC @ 1.5 A",
+     "2%",
+     "1%"
+    ],
+    [
+     "LCC600-28H-9P",
+     "180 to 305",
+     "28",
+     "±0.5%",
+     "24 to 30",
+     "0",
+     "25",
+     "600",
+     "93.5%",
+     "5 VDC @ 1.5 A",
+     "2%",
+     "1%"
+    ],
+    [
+     "LCC600-12U-9P",
+     "90 to 264",
+     "12",
+     "±0.5%",
+     "12 to 15",
+     "0",
+     "50",
+     "600",
+     "92%",
+     "5 VDC @ 1.5 A",
+     "2%",
+     "1%"
+    ],
+    [
+     "LCC600-12H-9P",
+     "180 to 305",
+     "12",
+     "±0.5%",
+     "12 to 15",
+     "0",
+     "50",
+     "600",
+     "92%",
+     "5 VDC @ 1.5 A",
+     "2%",
+     "1%"
+    ]
+   ],
+   "partNumbers": [
+    "LCC600-48U-9P",
+    "LCC600-48H-9P",
+    "LCC600-36U-9P",
+    "LCC600-36H-9P",
+    "LCC600-28U-9P",
+    "LCC600-28H-9P",
+    "LCC600-12U-9P",
+    "LCC600-12H-9P"
+   ]
+  },
+  {
+   "page": 23,
+   "section": "LCC1200 Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "FANLESS/CONDUCTION COOLED",
+   "title": "Ordering Information",
+   "headers": [
+    "SERIES",
+    "Nominal Output Voltage",
+    "Trimming Range (Minimum)",
+    "Maximum",
+    "Setpoint",
+    "Pout, Max",
+    "Iout, Max",
+    "Output Ripple",
+    "Line/Load/Temp Regulation"
+   ],
+   "rows": [
+    [
+     "LCC1200-28U-4P",
+     "28",
+     "24",
+     "30",
+     "±0.5%",
+     "1200",
+     "42.9",
+     "1%",
+     "2%"
+    ],
+    [
+     "LCC1200-28U-9P",
+     "28",
+     "24",
+     "30",
+     "±0.5%",
+     "1200",
+     "42.9",
+     "1%",
+     "2%"
+    ],
+    [
+     "LCC1200-28U-4P24",
+     "24",
+     "24",
+     "24",
+     "±0.5%",
+     "1200",
+     "50.0",
+     "1%",
+     "2%"
+    ],
+    [
+     "LCC1200-28U-9P24",
+     "24",
+     "24",
+     "24",
+     "±0.5%",
+     "1200",
+     "50.0",
+     "1%",
+     "2%"
+    ],
+    [
+     "LCC1200-48U-4P",
+     "48",
+     "42",
+     "57.6",
+     "±0.5%",
+     "1200",
+     "25.0",
+     "1%",
+     "2%"
+    ],
+    [
+     "LCC1200-48U-9P",
+     "48",
+     "40",
+     "57.6",
+     "±0.5%",
+     "1200",
+     "25.0",
+     "1%",
+     "2%"
+    ]
+   ],
+   "partNumbers": [
+    "LCC1200-28U-4P",
+    "LCC1200-28U-9P",
+    "LCC1200-28U-4P24",
+    "LCC1200-28U-9P24",
+    "LCC1200-48U-4P",
+    "LCC1200-48U-9P"
+   ]
+  },
+  {
+   "page": 47,
+   "section": "UltiMod Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "MODULAR",
+   "title": "Ordering Information",
+   "headers": [
+    "Model (XgA)",
+    "Vnom (V) (12.0)",
+    "Set Point Adjust Range (10.8 to 15.6)",
+    "Dynamic Vtrim Range (V) (—)",
+    "Imax (A) (12.5)",
+    "Power (W) (150)",
+    "Remote Sense (—)",
+    "Power Good (—)"
+   ],
+   "rows": [
+    [
+     "XgB",
+     "24.0",
+     "19.2 to 26.4",
+     "—",
+     "8.3",
+     "200",
+     "—",
+     "—"
+    ],
+    [
+     "XgC",
+     "36.0",
+     "28.8 to 39.6",
+     "—",
+     "5.6",
+     "200",
+     "—",
+     "—"
+    ],
+    [
+     "XgD",
+     "48.0",
+     "38.5 to 50.4",
+     "—",
+     "4.2",
+     "200",
+     "—",
+     "—"
+    ],
+    [
+     "XgE/Xg7",
+     "24.0",
+     "5.0 to 28.0",
+     "—",
+     "5.0",
+     "120",
+     "—",
+     "—"
+    ],
+    [
+     "XgF/Xg8 (v1)",
+     "24.0",
+     "5.0 to 28.0",
+     "—",
+     "3.0",
+     "72",
+     "—",
+     "Yes"
+    ],
+    [
+     "(v2)",
+     "24.0",
+     "5.0 to 28.0",
+     "—",
+     "3.0",
+     "72",
+     "—",
+     "Yes"
+    ],
+    [
+     "XgG",
+     "2.5",
+     "1.5 to 3.6",
+     "1.15 to 3.6",
+     "40.0",
+     "100",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgH",
+     "5.0",
+     "3.2 to 6.0",
+     "1.5 to 6.0",
+     "36.0",
+     "180",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgJ",
+     "12.0",
+     "6.0 to 15.0",
+     "4.0 to 15.0",
+     "18.3",
+     "220",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgK",
+     "24.0",
+     "12.0 to 30.0",
+     "8.0 to 30.0",
+     "9.2",
+     "220",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgL",
+     "48.0",
+     "28.0 to 58.0",
+     "8.0 to 58.0",
+     "5.0",
+     "240",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "Xg1",
+     "2.5",
+     "1.5 to 3.6",
+     "1.15 to 3.6",
+     "50.0",
+     "125",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "Xg2",
+     "5.0",
+     "3.2 to 6.0",
+     "1.5 to 6.0",
+     "40.0",
+     "200",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "Xg3",
+     "12.0",
+     "6.0 to 15.0",
+     "4.0 to 15.0",
+     "20.0",
+     "240",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "Xg4",
+     "24.0",
+     "12.0 to 30.0",
+     "8.0 to 30.0",
+     "10.0",
+     "240",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "Xg5",
+     "48.0",
+     "28.0 to 58.0",
+     "8.0 to 58.0",
+     "6.0",
+     "288",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgM",
+     "5.0",
+     "3.2 to 6.0",
+     "1.0 to 6.0",
+     "40.0",
+     "200",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgN",
+     "12.0",
+     "6.0 to 15.0",
+     "1.0 to 15.0",
+     "20.0",
+     "240",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgP",
+     "24.0",
+     "12.0 to 30.0",
+     "1.0 to 30.01",
+     "10.0",
+     "240",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgQ",
+     "48.0",
+     "24.0 to 58.0",
+     "1.0 to 58.02",
+     "6.0",
+     "288",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XgR",
+     "24.0",
+     "12.0 to 30.0",
+     "8.0 to 30.0",
+     "10.0",
+     "240",
+     "—",
+     "Yes"
+    ],
+    [
+     "XgT",
+     "48.0",
+     "28.0 to 58.0",
+     "8.0 to 58.0",
+     "6.0",
+     "288",
+     "—",
+     "Yes"
+    ]
+   ],
+   "partNumbers": [
+    "XgB",
+    "XgC",
+    "XgD",
+    "XgE/Xg7",
+    "XgF/Xg8 (v1)",
+    "(v2)",
+    "XgG",
+    "XgH",
+    "XgJ",
+    "XgK",
+    "XgL",
+    "Xg1",
+    "Xg2",
+    "Xg3",
+    "Xg4",
+    "Xg5",
+    "XgM",
+    "XgN",
+    "XgP",
+    "XgQ",
+    "XgR",
+    "XgT"
+   ]
+  },
+  {
+   "page": 62,
+   "section": "Next Generation NeoPower (NP)",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "MODULAR",
+   "title": "Ordering Information",
+   "headers": [
+    "Parallel and Series Connection Table",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "rows": [
+    [
+     "Case",
+     "Starting Slot",
+     "#Slots Connected Across",
+     "Parallel/Series",
+     "Module Slots Connected"
+    ],
+    [
+     "NP05/08",
+     "1",
+     "2",
+     "P/S",
+     "1&2"
+    ],
+    [
+     "NP05/08",
+     "2",
+     "2",
+     "P/S",
+     "2&3"
+    ],
+    [
+     "NP05/08",
+     "3",
+     "2",
+     "P/S",
+     "3&4"
+    ],
+    [
+     "NP05/08",
+     "4",
+     "2",
+     "P/S",
+     "4&5"
+    ],
+    [
+     "NP08",
+     "5",
+     "2",
+     "P/S",
+     "5&6"
+    ],
+    [
+     "NP08",
+     "6",
+     "2",
+     "P/S",
+     "6&7"
+    ],
+    [
+     "NP08",
+     "7",
+     "2",
+     "P/S",
+     "7&8"
+    ],
+    [
+     "NP05/08",
+     "1",
+     "3",
+     "P/S",
+     "1&2&3"
+    ],
+    [
+     "NP05/08",
+     "2",
+     "3",
+     "P/S",
+     "2&3&4"
+    ],
+    [
+     "NP05/08",
+     "3",
+     "3",
+     "P/S",
+     "3&4&5"
+    ],
+    [
+     "NP08",
+     "4",
+     "3",
+     "P/S",
+     "4&5&6"
+    ],
+    [
+     "NP08",
+     "5",
+     "3",
+     "P/S",
+     "5&6&7"
+    ],
+    [
+     "NP08",
+     "6",
+     "3",
+     "P/S",
+     "6&7&8"
+    ],
+    [
+     "NP05/08",
+     "1",
+     "4",
+     "P/S",
+     "1&2&3&4"
+    ],
+    [
+     "NP05/08",
+     "2",
+     "4",
+     "P/S",
+     "2&3&4&5"
+    ],
+    [
+     "NP08",
+     "3",
+     "4",
+     "P/S",
+     "3&4&5&6"
+    ],
+    [
+     "NP08",
+     "4",
+     "4",
+     "P/S",
+     "4&5&6&7"
+    ],
+    [
+     "NP08",
+     "5",
+     "4",
+     "P/S",
+     "5&6&7&8"
+    ],
+    [
+     "NP05/08",
+     "1",
+     "5",
+     "P/S",
+     "1&2&3&4&5"
+    ],
+    [
+     "NP08",
+     "2",
+     "5",
+     "P/S",
+     "2&3&4&5&6"
+    ],
+    [
+     "NP08",
+     "3",
+     "5",
+     "P/S",
+     "3&4&5&6&7"
+    ],
+    [
+     "NP08",
+     "4",
+     "5",
+     "P/S",
+     "4&5&6&7&8"
+    ],
+    [
+     "NP08",
+     "1",
+     "6",
+     "P/S",
+     "1&2&3&4&5&6"
+    ],
+    [
+     "NP08",
+     "2",
+     "6",
+     "P/S",
+     "2&3&4&5&6&7"
+    ],
+    [
+     "NP08",
+     "3",
+     "6",
+     "P/S",
+     "3&4&5&6&7&8"
+    ],
+    [
+     "NP08",
+     "1",
+     "7",
+     "P/S",
+     "1&2&3&4&5&6&7"
+    ],
+    [
+     "NP08",
+     "2",
+     "7",
+     "P/S",
+     "2&3&4&5&6&7&8"
+    ],
+    [
+     "NP08",
+     "1",
+     "8",
+     "P/S",
+     "1&2&3&4&5&6&7&8"
+    ]
+   ],
+   "partNumbers": [
+    "Case",
+    "NP05/08",
+    "NP05/08",
+    "NP05/08",
+    "NP05/08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP05/08",
+    "NP05/08",
+    "NP05/08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP05/08",
+    "NP05/08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP05/08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP08",
+    "NP08"
+   ]
+  },
+  {
+   "page": 63,
+   "section": "Next Generation NeoPower (NP)",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "MODULAR",
+   "title": "Ordering Information",
+   "headers": [
+    "Case Code (NPWWXYZ)",
+    "-",
+    "Module Options Codes First - # of Slots Second - Type Third - Voltage Code Forth - Option Code (XYZO)",
+    "-",
+    "Case Option Codes First - Case Options Second - Configuration Code (XY)",
+    "-",
+    "Parallel/ Series Code Separate multiple codes with \"&\" (XYZ)",
+    "-",
+    "Software Code (A)",
+    "-",
+    "Communication Bus (0)",
+    "-",
+    "Modification Code (XXX)"
+   ],
+   "rows": [
+    [
+     "WW = Number of Slots - Case Size 05 = 5 Slots 08 = 8 Slots X = Input Voltage Range W = Wide range 90 to 264 VAC H = High line L = Low line Y = Input Phase 1 = Single phase Z = Input Line A = AC input",
+     "",
+     "X = Number of Slots for Module 1 = 1 slot, single O/P 2 = 1 slot, dual O/P Y = Module Type L = Low Noise M = Medical Z = Voltage Code(s) See table O* = Option Codes 1 O/P Module Only 0 = DVS, Module ON 1 = DCS, Module ON 2 = AVS, Module ON 3 = ACS, Module ON 4 = DVS, Module OFF 5 = DCS, Module OFF 6 = AVS, Module OFF 7 = ACS, Module OFF Z = Option defined in MOD-I",
+     "",
+     "X = Case Options 0 = No options 1 = Reverse air Z = See MOD-I Y = Configuration Code 0 = Shipped from AEI cases/modules C = Shipped configured, modules installed",
+     "",
+     "See Table 000 = No series/ parallel",
+     "",
+     "A = Standard B = Non standard voltage",
+     "",
+     "0 = Standard MODBUD RTU Z = See MOD",
+     "",
+     "Advanced Energy assigned code to track modification made from the standard design CC = Conformal coating"
+    ]
+   ],
+   "partNumbers": [
+    "WW = Number of Slots - Case Size 05 = 5 Slots 08 = 8 Slots X = Input Voltage Range W = Wide range 90 to 264 VAC H = High line L = Low line Y = Input Phase 1 = Single phase Z = Input Line A = AC input"
+   ]
+  },
+  {
+   "page": 71,
+   "section": "Precision High Power System (iHP)",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "MODULAR",
+   "title": "Ordering Information",
+   "headers": [
+    "Case Code",
+    "",
+    "Module Codes",
+    "",
+    "Parallel/Series Case Code",
+    "",
+    "Conf Code"
+   ],
+   "rows": [
+    [
+     "iHP**XYZA-",
+     "",
+     "-XVZ* (x4/x8)",
+     "",
+     "-XX-**",
+     "",
+     "-X"
+    ],
+    [
+     "Case Decoder",
+     "iHP**XYA",
+     "Module Decoder",
+     "XVZ",
+     "First Digit",
+     "Second Digit",
+     "Blank = Ship as a kit"
+    ],
+    [
+     "** = Case Power",
+     "",
+     "X = Output Type",
+     "",
+     "0 = None",
+     "0 = None",
+     "C = Ship Configured"
+    ],
+    [
+     "",
+     "12 = 12kW 19\" Rack 15 = 15kW 19\" Rack 24 = 24kW 19\" Rack 30 = 30kW 19\" Rack 24S = 24kW 19\" Rack Short 30S = 30kW 19\" Rack Short",
+     "",
+     "S = Single O/P (1-Slot) T = Single O/P (3-Slot)",
+     "1 = Slot 1 & 2",
+     "P = Parallel",
+     "Any other Alpha Character = Special set-up configuration"
+    ],
+    [
+     "",
+     "",
+     "V = Nominal Voltage",
+     "",
+     "2 = Slot 2 & 3",
+     "S = Series",
+     "Mod Code"
+    ],
+    [
+     "",
+     "",
+     "",
+     "A = 200V B = Future C = Future D = Future L = 12V Q = 24V T = 32V W = 48V (50V for 12kW) 8 = 80V 1 = 125V 2 = 250V 3 = 300V (12kW ONLY)",
+     "3 = Slot 3 & 4",
+     "1 = Combo 2 P/S",
+     "-XXX"
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "Factory Assigned"
+    ],
+    [
+     "X = Voltage Range",
+     "",
+     "",
+     "",
+     "4 = Slot 4 & 5",
+     "2 = Combo 2 S/P",
+     ""
+    ],
+    [
+     "",
+     "L = Low Range 180 to 264 H = High Range 342 to 528 C = Canadian 540 to 660",
+     "",
+     "",
+     "5 = Slot 5 & 6",
+     "3 = Combo 3 P/P/S",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "6 = Slot 6 & 7",
+     "4 = Combo 3 P/S/P",
+     ""
+    ],
+    [
+     "Y = Input Phase",
+     "",
+     "",
+     "",
+     "7 = Slot 7 & 8",
+     "5 = Combo 3 P/S/S",
+     ""
+    ],
+    [
+     "",
+     "1 = Single Phase 3 = 3 Phase",
+     "",
+     "",
+     "8 = Slot 1, 2, & 3",
+     "6 = Combo 3 S/P/P",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "9 = Slot 1, 2, 3, & 4",
+     "7 = Combo 3 S/P/S",
+     ""
+    ],
+    [
+     "Z = Cooling",
+     "",
+     "Z = Mode",
+     "Blank = Standard",
+     "A = Slot 1, 2, 3, 4, & 5",
+     "8 = Combo 3 S/S/P",
+     ""
+    ],
+    [
+     "",
+     "A = Air Cooled",
+     "",
+     "P = Precision",
+     "B = Slot 1, 2, 3, 4, 5, & 6",
+     "9 = Combo 4 P/P/P/S",
+     ""
+    ],
+    [
+     "A = Accessory Options",
+     "",
+     "",
+     "",
+     "C = Slot 1, 2, 3, 4, 5, 6, & 7",
+     "A = Combo 4 P/P/S/P",
+     ""
+    ],
+    [
+     "",
+     "Blank = Full control C = Factory Configured and Tested 1-9 = Future",
+     "",
+     "",
+     "D = Slot 1, 2, 3, 4, 5, 6, 7, & 8",
+     "B = Combo 4 P/P/S/S",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "E = Slot 1 & 2; 3 & 4",
+     "C = Combo 4 P/S/P/P",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "F = Slot 1 & 2; 3 & 4; 5 & 6",
+     "D = Combo 4 P/S/P/S",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "G = Slot 1 & 2; 3 & 4; 5 & 6; 7 & 8",
+     "E = Combo 4 P/S/S/P",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "H = Slot 1, 2, & 3; 4 & 5",
+     "F = Combo 4 P/S/S/S",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "J = Slot 1, 2, & 3; 4 & 5; 6 & 7",
+     "G = Combo 4 S/P/P/P",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "K = Slot 1, 2, & 3; 4, 5, & 6",
+     "H = Combo 4 S/P/P/S",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "L = Slot 1, 2, & 3; 4, 5, & 6; 7 & 8",
+     "J = Combo 4 S/P/S/P",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "M = Slot 1, 2, 3, & 4; 5 & 6",
+     "K = Combo 4 S/P/S/S",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "N = Slot 1, 2, 3, & 4; 5 & 6; 7 & 8",
+     "L = Combo 4 S/S/P/P",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "P = Slot 1, 2, 3, & 4; 5, 6, & 7",
+     "M = Combo 4 S/S/P/S",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "R = Slot 1, 2, 3, & 4; 5, 6, 7, & 8",
+     "N = Combo 4 S/S/S/P",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "S = Slot 1, 2, 3, 4, & 5; 6 & 7",
+     "",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "T = Slot 1, 2, 3, 4, & 5; 6, 7, & 8",
+     "",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "U = Slot 1, 2, 3, 4, 5, & 6; 7 & 8",
+     "",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "Z = Special Defined by MOD Code",
+     "",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "-** is allowed for secondary series/parallel code",
+     "",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "1 = Groups 1 & 2",
+     "P = Parallel",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "8 = Groups 1, 2, & 3",
+     "S = Series",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "9 = Groups 1, 2, 3, & 4",
+     "1 = Combo 2 P/S",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "",
+     "E = Groups 1 & 2; 3 & 4",
+     "2 = Combo 2 S/P",
+     ""
+    ]
+   ],
+   "partNumbers": [
+    "iHP**XYZA-",
+    "Case Decoder",
+    "** = Case Power",
+    "X = Voltage Range",
+    "Y = Input Phase",
+    "Z = Cooling",
+    "A = Accessory Options"
+   ]
+  },
+  {
+   "page": 73,
+   "section": "Intelligent Transfer Switch (iTS)",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "MODULAR",
+   "title": "Ordering Information",
+   "headers": [
+    "Model",
+    "Configuration"
+   ],
+   "rows": [
+    [
+     "73-779-008",
+     "Fully configured, Rack with 8 relay modules"
+    ],
+    [
+     "73-779-007",
+     "Rack with 7 relay modules"
+    ],
+    [
+     "73-779-006",
+     "Rack with 6 relay modules"
+    ],
+    [
+     "73-779-005",
+     "Rack with 5 relay modules"
+    ],
+    [
+     "73-779-004",
+     "Rack with 4 relay modules"
+    ],
+    [
+     "73-779-003",
+     "Rack with 3 relay modules"
+    ],
+    [
+     "73-779-002",
+     "Rack with 2 relay modules"
+    ],
+    [
+     "73-779-001",
+     "Rack with 1 relay module"
+    ],
+    [
+     "73-779-000",
+     "Relay module only"
+    ],
+    [
+     "73-779-TBD",
+     "Blank relay module"
+    ]
+   ],
+   "partNumbers": [
+    "73-779-008",
+    "73-779-007",
+    "73-779-006",
+    "73-779-005",
+    "73-779-004",
+    "73-779-003",
+    "73-779-002",
+    "73-779-001",
+    "73-779-000",
+    "73-779-TBD"
+   ]
+  },
+  {
+   "page": 75,
+   "section": "LCM Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number1 (LCM300L)",
+    "Output (12 V)",
+    "Nominal Output Voltage Set Point (12 V)",
+    "Set Point Tolerance (±0.5%)",
+    "Adjustment Range (9.6 to 14.4 V)",
+    "Current Min Max (0 A)",
+    "25 A",
+    "Output Ripple P/P (0 to 50°C) (120 mV)",
+    "Max Continuous Power (310)",
+    "Combined Line/ Load Regulation (2%)"
+   ],
+   "rows": [
+    [
+     "LCM300N",
+     "15 V",
+     "15 V",
+     "±0.5%",
+     "12.0 to 19.5 V",
+     "0 A",
+     "20 A",
+     "150 mV",
+     "310",
+     "2%"
+    ],
+    [
+     "LCM300Q",
+     "24 V",
+     "24 V",
+     "±0.5%",
+     "19.2 to 28.8 V",
+     "0 A",
+     "12.5 A",
+     "240 mV",
+     "310",
+     "2%"
+    ],
+    [
+     "LCM300U",
+     "36 V",
+     "36 V",
+     "±0.5%",
+     "28.8 to 43.2 V",
+     "0 A",
+     "8.4 A",
+     "360 mV",
+     "310",
+     "2%"
+    ],
+    [
+     "LCM300W",
+     "48 V",
+     "48 V",
+     "±0.5%",
+     "38.4 to 57.6 V",
+     "0 A",
+     "6.3 A",
+     "480 mV",
+     "310",
+     "2%"
+    ]
+   ],
+   "partNumbers": [
+    "LCM300N",
+    "LCM300Q",
+    "LCM300U",
+    "LCM300W"
+   ]
+  },
+  {
+   "page": 77,
+   "section": "LCM Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number1 (LCM600L)",
+    "Output (12 V)",
+    "Nominal Output Voltage Set Point (12 V)",
+    "Set Point Tolerance (±0.5%)",
+    "Adjustment Range (9.6 to 14.4 V)",
+    "Current Min Max (0 A)",
+    "54 A",
+    "Output Ripple P/P (0 to 50°C) (120 mV)",
+    "Combined Line/ Load Regulation (2%)"
+   ],
+   "rows": [
+    [
+     "LCM600N",
+     "15 V",
+     "15 V",
+     "±0.5%",
+     "12.0 to 19.5 V",
+     "0 A",
+     "44 A",
+     "150 mV",
+     "2%"
+    ],
+    [
+     "LCM600Q",
+     "24 V",
+     "24 V",
+     "±0.5%",
+     "19.2 to 28.8 V",
+     "0 A",
+     "27 A",
+     "240 mV",
+     "2%"
+    ],
+    [
+     "LCM600U",
+     "36 V",
+     "36 V",
+     "±0.5%",
+     "28.8 to 43.2 V",
+     "0 A",
+     "16.7 A",
+     "360 mV",
+     "2%"
+    ],
+    [
+     "LCM600W",
+     "48 V",
+     "48 V",
+     "±0.5%",
+     "38.4 to 57.6 V",
+     "0 A",
+     "14 A",
+     "480 mV",
+     "2%"
+    ]
+   ],
+   "partNumbers": [
+    "LCM600N",
+    "LCM600Q",
+    "LCM600U",
+    "LCM600W"
+   ]
+  },
+  {
+   "page": 79,
+   "section": "LCM Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number1 (LCM1000L)",
+    "Output (12 V)",
+    "Nominal Output Voltage Set Point (12 V)",
+    "Set Point Tolerance (±0.5%)",
+    "Adjustment Range (10.8 to 13.2 V)",
+    "Current Min Max (0 A)",
+    "83.3 A",
+    "Output Ripple P/P (0 to 50°C) (120 mV)",
+    "Max Continuous Power (1000 W)",
+    "Combined Line/Load Regulation (2%)"
+   ],
+   "rows": [
+    [
+     "LCM1000N",
+     "15 V",
+     "15 V",
+     "±0.5%",
+     "13.5 to 16.5 V",
+     "0 A",
+     "66.7 A",
+     "150 mV",
+     "1000 W",
+     "2%"
+    ],
+    [
+     "LCM1000Q",
+     "24 V",
+     "24 V",
+     "±0.5%",
+     "21.6 to 26.4 V",
+     "0 A",
+     "41.7 A",
+     "240 mV",
+     "1000 W",
+     "2%"
+    ],
+    [
+     "LCM1000U",
+     "36 V",
+     "36 V",
+     "±0.5%",
+     "32.4 to 39.6 V",
+     "0 A",
+     "27.8 A",
+     "360 mV",
+     "1000 W",
+     "2%"
+    ],
+    [
+     "LCM1000W",
+     "48 V",
+     "48 V",
+     "±0.5%",
+     "43.2 to 52.8 V",
+     "0 A",
+     "20.8 A",
+     "480 mV",
+     "1000 W",
+     "2%"
+    ]
+   ],
+   "partNumbers": [
+    "LCM1000N",
+    "LCM1000Q",
+    "LCM1000U",
+    "LCM1000W"
+   ]
+  },
+  {
+   "page": 81,
+   "section": "LCM Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number1 (LCM1500L)",
+    "Output (12 V)",
+    "Nominal Output Voltage Set Point (12 V)",
+    "Set Point Tolerance (±0.5%)",
+    "Adjustment Range (10.8 to 13.2 V)",
+    "Current Min Max (0 A)",
+    "133 A",
+    "Output Ripple P/P (0 to 50°C) (120 mV)",
+    "Max Continuous Power (1500)",
+    "Combined Line/Load Regulation (2%)"
+   ],
+   "rows": [
+    [
+     "LCM1500N",
+     "15 V",
+     "15 V",
+     "±0.5%",
+     "13.5 to 16.5 V",
+     "0 A",
+     "100 A",
+     "150 mV",
+     "1500",
+     "2%"
+    ],
+    [
+     "LCM1500Q",
+     "24 V",
+     "24 V",
+     "±0.5%",
+     "21.6 to 26.4 V",
+     "0 A",
+     "67 A",
+     "240 mV",
+     "1500",
+     "2%"
+    ],
+    [
+     "LCM1500R",
+     "28 V",
+     "28 V",
+     "±0.5%",
+     "25.2 to 30.8 V",
+     "0 A",
+     "53.6 A",
+     "280 mV",
+     "1500",
+     "2%"
+    ],
+    [
+     "LCM1500U",
+     "36 V",
+     "36 V",
+     "±0.5%",
+     "32.4 to 39.6 V",
+     "0 A",
+     "43 A",
+     "360 mV",
+     "1500",
+     "2%"
+    ],
+    [
+     "LCM1500W",
+     "48 V",
+     "48 V",
+     "±0.5%",
+     "43.2 to 52.8 V",
+     "0 A",
+     "33 A",
+     "480 mV",
+     "1500",
+     "2%"
+    ]
+   ],
+   "partNumbers": [
+    "LCM1500N",
+    "LCM1500Q",
+    "LCM1500R",
+    "LCM1500U",
+    "LCM1500W"
+   ]
+  },
+  {
+   "page": 83,
+   "section": "LCM Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number",
+    "Nominal Output Voltage Set Point",
+    "Adjustment Range",
+    "",
+    "Max I",
+    "Output Ripple P/P (0 to 50°C)",
+    "Combined Line/Load Regulation",
+    "Trim Range ± 25%",
+    "“Vprog Adjustment” 0 V to 6 V (20% to 125% Vout)"
+   ],
+   "rows": [
+    [
+     "",
+     "",
+     "Max I",
+     "Max Power (3000 W)",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "LCM3000L-T",
+     "12 V",
+     "2.4 to 12 V",
+     "12 to 15 V",
+     "250 A",
+     "120 mV or 1%, whichever is higher",
+     "1%",
+     "9 to 15 V",
+     "2.4 to 15 V"
+    ],
+    [
+     "LCM30008-T",
+     "18 V",
+     "3.6 to 18 V",
+     "18 to 22.5 V",
+     "166.7 A",
+     "180 mV or 1%, whichever is higher",
+     "1%",
+     "13.5 to 22.5 V",
+     "3.6 to 22.5 V"
+    ],
+    [
+     "LCM3000Q-T",
+     "24 V",
+     "4.8 to 24 V",
+     "24 to 30 V",
+     "125 A",
+     "240 mV or 1%, whichever is higher",
+     "1%",
+     "18 to 30 V",
+     "4.8 to 30 V"
+    ],
+    [
+     "LCM3000U-T",
+     "36 V",
+     "7.2 to 36 V",
+     "36 to 45 V",
+     "83.3 A",
+     "360 mV or 1%, whichever is higher",
+     "1%",
+     "27 to 45 V",
+     "7.2 to 45 V"
+    ],
+    [
+     "LCM3000W-T",
+     "48 V",
+     "9.6 to 48 V",
+     "48 to 60 V",
+     "62.5 A",
+     "480 mV or 1%, whichever is higher",
+     "1%",
+     "36 to 60 V",
+     "9.6 to 60 V"
+    ],
+    [
+     "LCM30007-T",
+     "72 V",
+     "14.4 to 72 V",
+     "72 to 90 V",
+     "41.7 A",
+     "720 mV or 1%, whichever is higher",
+     "1%",
+     "54 to 90 V",
+     "14.4 to 90 V"
+    ]
+   ],
+   "partNumbers": [
+    "LCM3000L-T",
+    "LCM30008-T",
+    "LCM3000Q-T",
+    "LCM3000U-T",
+    "LCM3000W-T",
+    "LCM30007-T"
+   ]
+  },
+  {
+   "page": 85,
+   "section": "TF Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number1",
+    "Output Voltage",
+    "Output Current",
+    "Output Power",
+    "Line Regulation",
+    "Load Regulation",
+    "Ripple & Noise P/P2",
+    "Voltage Tolerance3",
+    "Efficiency"
+   ],
+   "rows": [
+    [
+     "TF800 Series",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "TF800A12K",
+     "12 V",
+     "0 to 66.7 A",
+     "800 W",
+     "±1%",
+     "±1%",
+     "150 mV",
+     "±2%",
+     "89%"
+    ],
+    [
+     "TF800A15K",
+     "15 V",
+     "0 to 53.4 A",
+     "800 W",
+     "±1%",
+     "±1%",
+     "150 mV",
+     "±2%",
+     "90%"
+    ],
+    [
+     "TF800A24K",
+     "24 V",
+     "0 to 33.5 A",
+     "800 W",
+     "±1%",
+     "±1%",
+     "240 mV",
+     "±2%",
+     "92%"
+    ],
+    [
+     "TF800A48K",
+     "48 V",
+     "0 to 16.7 A",
+     "800 W",
+     "±1%",
+     "±1%",
+     "480 mV",
+     "±2%",
+     "92%"
+    ],
+    [
+     "TF800A60K",
+     "60 V",
+     "0 to 13.4 A",
+     "800 W",
+     "±1%",
+     "±1%",
+     "600 mV",
+     "±2%",
+     "93%"
+    ],
+    [
+     "TF1500 Series",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "TF1500A12K",
+     "12 V",
+     "0 to 125 A",
+     "1500 W",
+     "±1%",
+     "±1%",
+     "150 mV",
+     "±2%",
+     "89%"
+    ],
+    [
+     "TF1500A15K",
+     "15 V",
+     "0 to 100 A",
+     "1500 W",
+     "±1%",
+     "±1%",
+     "150 mV",
+     "±2%",
+     "90%"
+    ],
+    [
+     "TF1500A24K",
+     "24 V",
+     "0 to 62.5 A",
+     "1500 W",
+     "±1%",
+     "±1%",
+     "240 mV",
+     "±2%",
+     "92%"
+    ],
+    [
+     "TF1500A48K",
+     "48 V",
+     "0 to 31.37 A",
+     "1500 W",
+     "±1%",
+     "±1%",
+     "480 mV",
+     "±2%",
+     "92%"
+    ],
+    [
+     "TF1500A60K",
+     "60 V",
+     "0 to 25 A",
+     "1500 W",
+     "±1%",
+     "±1%",
+     "600 mV",
+     "±2%",
+     "93%"
+    ],
+    [
+     "TF3000 Series",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "TF3000A12K",
+     "12 V",
+     "0 to 200 A",
+     "2400 W",
+     "±1%",
+     "±1%",
+     "150 mV",
+     "±2%",
+     "88%"
+    ],
+    [
+     "TF3000A15K",
+     "15 V",
+     "0 to 160 A",
+     "2400 W",
+     "±1%",
+     "±1%",
+     "150 mV",
+     "±2%",
+     "89%"
+    ],
+    [
+     "TF3000A24K",
+     "24 V",
+     "0 to 125 A",
+     "3000 W",
+     "±1%",
+     "±1%",
+     "240 mV",
+     "±2%",
+     "91%"
+    ],
+    [
+     "TF3000A48K",
+     "48 V",
+     "0 to 62.5 A",
+     "3000 W",
+     "±1%",
+     "±1%",
+     "480 mV",
+     "±2%",
+     "92%"
+    ],
+    [
+     "TF3000A60K",
+     "60 V",
+     "0 to 50 A",
+     "3000 W",
+     "±1%",
+     "±1%",
+     "600 mV",
+     "±2%",
+     "93%"
+    ],
+    [
+     "TF3000HV Series",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "TF3000A150K",
+     "150 V",
+     "0 to 20 A",
+     "3000 W",
+     "±1%",
+     "±1%",
+     "1500 mV",
+     "±2%",
+     "93%"
+    ],
+    [
+     "TF3000A200K",
+     "200 V",
+     "0 to 15 A",
+     "3000 W",
+     "±1%",
+     "±1%",
+     "2000 mV",
+     "±2%",
+     "93%"
+    ],
+    [
+     "TF3000A250K",
+     "250 V",
+     "0 to 12 A",
+     "3000 W",
+     "±1%",
+     "±1%",
+     "2500 mV",
+     "±2%",
+     "93%"
+    ],
+    [
+     "TF3000A300K",
+     "300 V",
+     "0 to 10 A",
+     "3000 W",
+     "±1%",
+     "±1%",
+     "3000 mV",
+     "±2%",
+     "93%"
+    ],
+    [
+     "TF3000A400K",
+     "400 V",
+     "0 to 7.5 A",
+     "3000 W",
+     "±1%",
+     "±1%",
+     "4000 mV",
+     "±2%",
+     "93%"
+    ]
+   ],
+   "partNumbers": [
+    "TF800 Series",
+    "TF800A12K",
+    "TF800A15K",
+    "TF800A24K",
+    "TF800A48K",
+    "TF800A60K",
+    "TF1500 Series",
+    "TF1500A12K",
+    "TF1500A15K",
+    "TF1500A24K",
+    "TF1500A48K",
+    "TF1500A60K",
+    "TF3000 Series",
+    "TF3000A12K",
+    "TF3000A15K",
+    "TF3000A24K",
+    "TF3000A48K",
+    "TF3000A60K",
+    "TF3000HV Series",
+    "TF3000A150K",
+    "TF3000A200K",
+    "TF3000A250K",
+    "TF3000A300K",
+    "TF3000A400K"
+   ]
+  },
+  {
+   "page": 87,
+   "section": "TF Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "LCM4000HV",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "rows": [
+    [
+     "Description",
+     "Model Number",
+     "Input Range",
+     "Default Output Setting1",
+     "",
+     ""
+    ],
+    [
+     "",
+     "",
+     "",
+     "Output Mode",
+     "Output Current",
+     "Output Voltage"
+    ],
+    [
+     "Standalone 4 kW module",
+     "LCM4000HV-T-P",
+     "187 to 264 VAC",
+     "Current Source",
+     "0 A",
+     "250 VDC"
+    ],
+    [
+     "",
+     "LCM4000HV-T-S",
+     "311 to 528 VAC",
+     "Current Source",
+     "0 A",
+     "250 VDC"
+    ],
+    [
+     "Pluggable 4 kW module for shelf use",
+     "LCM4000HV-P-P",
+     "187 to 264 VAC",
+     "Current Source",
+     "0 A",
+     "250 VDC"
+    ],
+    [
+     "",
+     "LCM4000HV-P-S",
+     "311 to 528 VAC",
+     "Current Source",
+     "0 A",
+     "250 VDC"
+    ]
+   ],
+   "partNumbers": [
+    "Description",
+    "Standalone 4 kW module",
+    "Pluggable 4 kW module for shelf use"
+   ]
+  },
+  {
+   "page": 87,
+   "section": "TF Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "LCM12K",
+    "",
+    ""
+   ],
+   "rows": [
+    [
+     "Model Number",
+     "Description",
+     "Input Range"
+    ],
+    [
+     "LCM12K-SHF-N",
+     "12 kW 250 V 1U shelf",
+     "High line, 600 VAC W/NEUTRAL"
+    ],
+    [
+     "LCM12K-SHF-P",
+     "12 kW 250 V 1U shelf",
+     "Low line, 200/220/230/240 VAC"
+    ],
+    [
+     "LCM12K-SHF-S",
+     "12 kW 250 V 1U shelf",
+     "High line, 380/480 VAC"
+    ],
+    [
+     "LCM12K-BLK",
+     "1U blank filler panel",
+     "N/A"
+    ]
+   ],
+   "partNumbers": [
+    "Model Number",
+    "LCM12K-SHF-N",
+    "LCM12K-SHF-P",
+    "LCM12K-SHF-S",
+    "LCM12K-BLK"
+   ]
+  },
+  {
+   "page": 89,
+   "section": "FCM10K/30K",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "FCM10K",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "rows": [
+    [
+     "Model Number",
+     "Nominal Output Voltage",
+     "Output Current",
+     "Standby Output",
+     "Efficiency",
+     "Description"
+    ],
+    [
+     "FCM10KW-N-P",
+     "54.5 VDC",
+     "183.5 A",
+     "5 V at 2 A",
+     "96.3%",
+     "Pluggable Connector"
+    ],
+    [
+     "FCM10KW-N-T",
+     "54.5 VDC",
+     "183.5 A",
+     "5 V at 2 A",
+     "96.3%",
+     "Terminal Block"
+    ]
+   ],
+   "partNumbers": [
+    "Model Number",
+    "FCM10KW-N-P",
+    "FCM10KW-N-T"
+   ]
+  },
+  {
+   "page": 89,
+   "section": "FCM10K/30K",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "FCM30K",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "rows": [
+    [
+     "Model Number",
+     "Nominal Output Voltage",
+     "Output Current",
+     "Standby Output",
+     "Efficiency",
+     "Description"
+    ],
+    [
+     "FCM30KSHNW-PRM",
+     "54.5 VDC",
+     "550.5 A",
+     "5 V at 1 A",
+     "95.5%",
+     "Narrow Trim Shelf, Pluggable AC input version, MODBUS RTU with PMI"
+    ],
+    [
+     "FCM30KSHNW-TRM",
+     "54.5 VDC",
+     "550.5 A",
+     "5 V at 1 A",
+     "95.5%",
+     "Narrow Trim Shelf, Terminal Block AC input version, MODBUS RTU with PMI"
+    ],
+    [
+     "FCM30KSHNW-PRN",
+     "54.5 VDC",
+     "550.5 A",
+     "5 V at 1 A",
+     "95.5%",
+     "Narrow Trim Shelf, Pluggable AC input version, MODBUS RTU without PMI"
+    ],
+    [
+     "FCM30KSHNW-TRN",
+     "54.5 VDC",
+     "550.5 A",
+     "5 V at 1 A",
+     "95.5%",
+     "Narrow Trim Shelf, Terminal Block AC input version, MODBUS RTU without PMI"
+    ]
+   ],
+   "partNumbers": [
+    "Model Number",
+    "FCM30KSHNW-PRM",
+    "FCM30KSHNW-TRM",
+    "FCM30KSHNW-PRN",
+    "FCM30KSHNW-TRN"
+   ]
+  },
+  {
+   "page": 91,
+   "section": "FCM33K",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number",
+    "Description"
+   ],
+   "rows": [
+    [
+     "FCM33K-SHF-L-W-T",
+     "6 outputs, 1U shelf, AC-DC 3-Phase input"
+    ],
+    [
+     "FCM5K5W-N-P",
+     "5.5 kW, AC-DC pluggable module 49.1 V/112 A"
+    ]
+   ],
+   "partNumbers": [
+    "FCM33K-SHF-L-W-T",
+    "FCM5K5W-N-P"
+   ]
+  },
+  {
+   "page": 93,
+   "section": "LumaDrive",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model Number (LMD02Uvv1L02401)",
+    "Number of Shelves (2)",
+    "Output Power (24 kW)"
+   ],
+   "rows": [
+    [
+     "LMD06Uvv#w012z",
+     "1",
+     "12 kW"
+    ],
+    [
+     "LMD06Uvv#w024z",
+     "2",
+     "24 kW"
+    ],
+    [
+     "LMD06Uvv#w036z",
+     "3",
+     "36 kW"
+    ],
+    [
+     "LMD10Uvv#w048z",
+     "4",
+     "48 kW"
+    ],
+    [
+     "LMD10Uvv#w060z",
+     "5",
+     "60 kW"
+    ],
+    [
+     "LMD10Uvv#w072z",
+     "6",
+     "72 kW"
+    ],
+    [
+     "LMD14Uvv#w084z",
+     "7",
+     "84 kW"
+    ],
+    [
+     "LMD14Uvv#w096z",
+     "8",
+     "96 kW"
+    ],
+    [
+     "LMD14Uvv#w108z",
+     "9",
+     "108 kW"
+    ],
+    [
+     "LMD18Uvv#w120z",
+     "10",
+     "120 kW"
+    ]
+   ],
+   "partNumbers": [
+    "LMD06Uvv#w012z",
+    "LMD06Uvv#w024z",
+    "LMD06Uvv#w036z",
+    "LMD10Uvv#w048z",
+    "LMD10Uvv#w060z",
+    "LMD10Uvv#w072z",
+    "LMD14Uvv#w084z",
+    "LMD14Uvv#w096z",
+    "LMD14Uvv#w108z",
+    "LMD18Uvv#w120z"
+   ]
+  },
+  {
+   "page": 93,
+   "section": "LumaDrive",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "LMDxxxvv#wyyyz-4xx Part Number Scheme",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "rows": [
+    [
+     "xxx Cabinet Size",
+     "vv Input Voltage & Module Matched",
+     "# Cabinet Features",
+     "w Output Panel Options",
+     "yyy Total Power",
+     "z Number of PDUs Installed",
+     "4xx"
+    ],
+    [
+     "06U, 10U, 14U, 18U or 02U1",
+     "1P = 1-phase, -P module PP = 3-phase LL, -P module SS = 3-phase HL, -S module NS = 3-phase + Neutral, -S module",
+     "0 = Standard free standing 1 = NEMA 3R, wall mount 2 = Standard wall mount",
+     "L = Liquid tight (circular connector) K = Knock out holes G = Cable gland",
+     "e.g. 036, 072, 108, 144",
+     "e.g. 1, 2, 3, 4 0 = No PDU D = DIN rail option. Specify in -4xx",
+     "Special MOD"
+    ]
+   ],
+   "partNumbers": [
+    "xxx Cabinet Size",
+    "06U, 10U, 14U, 18U or 02U1"
+   ]
+  },
+  {
+   "page": 95,
+   "section": "Xsolo Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model (XS500-24)",
+    "Power (W) (504)",
+    "Output Voltage (V) (24)",
+    "Output Current (A) (21.0)",
+    "Medical Approval UL/EN60601-1, 3rd Edition (Yes)",
+    "Industrial Approval UL/EN60950, 2rd Edition (Yes)"
+   ],
+   "rows": [
+    [
+     "XS1000-24",
+     "1008",
+     "24",
+     "42.0",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XS500-36",
+     "504",
+     "36",
+     "14.0",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XS1000-36",
+     "1008",
+     "36",
+     "28.0",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XS500-48",
+     "504",
+     "48",
+     "10.5",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XS1000-48",
+     "1008",
+     "48",
+     "21.0",
+     "Yes",
+     "Yes"
+    ]
+   ],
+   "partNumbers": [
+    "XS1000-24",
+    "XS500-36",
+    "XS1000-36",
+    "XS500-48",
+    "XS1000-48"
+   ]
+  },
+  {
+   "page": 95,
+   "section": "Xsolo Series",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "Model (XS500-24)",
+    "Description (Convection-cooled U-channel)",
+    "Set Point Adjust Range (V) (19 to 28)",
+    "Dynamic Vtrim Range (V) (14 to 28)",
+    "Imax (A) (21.0)",
+    "Remote Sense (Yes)",
+    "Power Good (Yes)"
+   ],
+   "rows": [
+    [
+     "XS1000-24",
+     "Enclosed fan-cooled",
+     "19 to 28",
+     "14 to 28",
+     "42.0",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XS500-36",
+     "Convection-cooled U-channel",
+     "26 to 40",
+     "20 to 40",
+     "14.0",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XS1000-36",
+     "Enclosed fan-cooled",
+     "26 to 40",
+     "20 to 40",
+     "28.0",
+     "Yes",
+     "Yes"
+    ],
+    [
+     "XS500-48",
+     "Convection-cooled U-channel",
+     "36 to 58",
+     "29 to 58",
+     "10.5",
+     "-",
+     "Yes"
+    ],
+    [
+     "XS1000-48",
+     "Enclosed fan-cooled",
+     "36 to 58",
+     "29 to 58",
+     "21.0",
+     "Yes",
+     "Yes"
+    ]
+   ],
+   "partNumbers": [
+    "XS1000-24",
+    "XS500-36",
+    "XS1000-36",
+    "XS500-48",
+    "XS1000-48"
+   ]
+  },
+  {
+   "page": 97,
+   "section": "Distributed power bulk front end",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Rack Ordering Information1",
+   "headers": [
+    "Module (Rack #)",
+    "HPS3000 (HPR12K)"
+   ],
+   "rows": [
+    [
+     "# of Slots",
+     "4"
+    ],
+    [
+     "Total Power",
+     "12000 W"
+    ]
+   ],
+   "partNumbers": [
+    "# of Slots",
+    "Total Power"
+   ]
+  },
+  {
+   "page": 97,
+   "section": "Distributed power bulk front end",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "BULK/DISTRIBUTED/ENCLOSED",
+   "title": "Ordering Information",
+   "headers": [
+    "HPS3000-9-001",
+    "High airflow performance",
+    "HPR120K-00-001"
+   ],
+   "rows": [
+    [
+     "HPS3000-9",
+     "Standard fans",
+     "HPR12K-00"
+    ]
+   ],
+   "partNumbers": [
+    "HPS3000-9"
+   ]
+  },
+  {
+   "page": 110,
+   "section": "50 V, 18 kW, 1OU Open Rack Power Shelf",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "RACKS",
+   "title": "Ordering Information",
+   "headers": [
+    "Model",
+    "Description"
+   ],
+   "rows": [
+    [
+     "700-015746-0100",
+     "Standard ORv3 Power Shelf – Single Whip"
+    ],
+    [
+     "700-015235-0100",
+     "Standard ORv3 Power Shelf – Dual Whip"
+    ]
+   ],
+   "partNumbers": [
+    "700-015746-0100",
+    "700-015235-0100"
+   ]
+  },
+  {
+   "page": 111,
+   "section": "50 V, 3 kW, Open Rack Rectifier",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "RACKS",
+   "title": "Ordering Information",
+   "headers": [
+    "Model",
+    "Description"
+   ],
+   "rows": [
+    [
+     "700-015234-0100",
+     "Standard ORv3 PSU"
+    ]
+   ],
+   "partNumbers": [
+    "700-015234-0100"
+   ]
+  },
+  {
+   "page": 112,
+   "section": "50 V, 33 kW, 1OU Open Rack HPR Power Shelf",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "RACKS",
+   "title": "Ordering Information",
+   "headers": [
+    "Model",
+    "Description"
+   ],
+   "rows": [
+    [
+     "700-037148-0100",
+     "Standard ORv3 HPR Power Shelf – Dual Whip"
+    ]
+   ],
+   "partNumbers": [
+    "700-037148-0100"
+   ]
+  },
+  {
+   "page": 113,
+   "section": "50 V, 5.5 kW, Open Rack HPR Rectifier",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "RACKS",
+   "title": "Ordering Information",
+   "headers": [
+    "Model",
+    "Description"
+   ],
+   "rows": [
+    [
+     "700-037147-0100",
+     "Standard ORv3 HPR 5.5 kW PSU"
+    ]
+   ],
+   "partNumbers": [
+    "700-037147-0100"
+   ]
+  },
+  {
+   "page": 114,
+   "section": "48 V, 30 kW, 2U EIA Power Shelf",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "RACKS",
+   "title": "Ordering Information",
+   "headers": [
+    "Part #",
+    "Description"
+   ],
+   "rows": [
+    [
+     "700-15496-0000",
+     "19\" 2RU 30KW Power Shelf"
+    ],
+    [
+     "700-15485-0000",
+     "48V 3KW ATS Power Supply"
+    ],
+    [
+     "700-15499-0000",
+     "Shelf Management Controller"
+    ]
+   ],
+   "partNumbers": [
+    "700-15496-0000",
+    "700-15485-0000",
+    "700-15499-0000"
+   ]
+  },
+  {
+   "page": 115,
+   "section": "48 V, 3 kW, EIA Rectifier with ATS",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "RACKS",
+   "title": "Ordering Information",
+   "headers": [
+    "Part #",
+    "Description"
+   ],
+   "rows": [
+    [
+     "700-15496-0000",
+     "19\" 2RU 30KW Power Shelf"
+    ],
+    [
+     "700-15485-0000",
+     "48V 3KW ATS Power Supply"
+    ],
+    [
+     "700-15499-0000",
+     "Shelf Management Controller"
+    ]
+   ],
+   "partNumbers": [
+    "700-15496-0000",
+    "700-15485-0000",
+    "700-15499-0000"
+   ]
+  },
+  {
+   "page": 116,
+   "section": "ADN Single & 3-phase",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "SPECIAL",
+   "title": "Ordering Information",
+   "headers": [
+    "Power",
+    "Voltage (VAC)",
+    "VDC",
+    "Current",
+    "Size L x W x H (in)",
+    "mm",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "120 W",
+     "85 to 264 VAC",
+     "90 to 375 VDC",
+     "5 A",
+     "4.85 x 1.97 x 4.37 in",
+     "123 x 50 x 111",
+     "ADN5-24-1PM-C"
+    ],
+    [
+     "240 W",
+     "85 to 264 VAC",
+     "90 to 375 VDC",
+     "10 A",
+     "4.85 x 2.36 x 4.37 in",
+     "123 x 60 x 111",
+     "ADN10-24-1PM-C"
+    ],
+    [
+     "480 W",
+     "85 to 264 VAC",
+     "90 to 375 VDC",
+     "20 A",
+     "4.85 x 3.42 x 4.96 in",
+     "123 x 87 x 126",
+     "ADN20-24-1PM-C"
+    ],
+    [
+     "960 W",
+     "85 to 264 VAC",
+     "90 to 375 VDC",
+     "40 A",
+     "4.81 x 7.09 x 4.85 in",
+     "122.2 x 180 x 123.3",
+     "ADN40-24-1PM-C"
+    ]
+   ],
+   "partNumbers": []
+  },
+  {
+   "page": 117,
+   "section": "ADN Single & 3-phase",
+   "sectionCategory": "AC-DC",
+   "sectionLineage": "SPECIAL",
+   "title": "Ordering Information",
+   "headers": [
+    "Power",
+    "Voltage (VAC)",
+    "VDC",
+    "Current",
+    "Size L x W x H (in)",
+    "mm",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "120 W",
+     "320 to 540 VAC",
+     "450 to 760 VDC",
+     "5 A @ 24 VDC",
+     "4.85 x 1.97 x 4.37 in",
+     "123 x 50 x 111",
+     "ADN5-24-3PM-C"
+    ],
+    [
+     "240 W",
+     "320 to 540 VAC",
+     "450 to 760 VDC",
+     "10 A @ 24 VDC",
+     "4.85 x 2.36 x 4.37 in",
+     "123 x 60 x 111",
+     "ADN10-24-3PM-C"
+    ],
+    [
+     "480 W",
+     "320 to 540 VAC",
+     "450 to 760 VDC",
+     "20 A @ 24 VDC",
+     "4.68 x 3.34 x 4.85 in",
+     "119 x 85 x 123",
+     "ADN20-24-3PM-C"
+    ],
+    [
+     "960 W",
+     "320 to 540 VAC",
+     "90 to 375 VDC",
+     "40 A @ 24 VDC",
+     "4.85 x 7.09 x 4.85 in",
+     "123 x 180 x 123",
+     "ADN40-24-3PM-C"
+    ]
+   ],
+   "partNumbers": []
+  },
+  {
+   "page": 120,
+   "section": "Quarter-Brick",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package L x W x H (mm)",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "3.3 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "40 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.39 in (57.9 x 36.8 x 9.8)",
+     "91%",
+     "AGQ200B-48S3V3-4L"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "40 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.50 in (57.9 x 36.8 x 12.7)",
+     "91%",
+     "AGQ200B-48S3V3B-4L"
+    ],
+    [
+     "5 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "20 A",
+     "24 V (18 to 36 V)",
+     "2.28 x 1.45 x 0.39 in (57.9 x 36.8 x 9.8)",
+     "91%",
+     "AVQ100-24S05-4L"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "20 A",
+     "24 V (18 to 36 V)",
+     "2.28 x 1.45 x 0.50 in (57.9 x 36.8 x 12.7)",
+     "91%",
+     "AVQ100-24S05B-4L"
+    ],
+    [
+     "10 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (40 to 60 V)",
+     "2.28 x 1.45 x 0.43 in (57.9 x 36.8 x 11)",
+     "95%",
+     "ADQ600-48S10-6L"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (40 to 60 V)",
+     "2.28 x 1.45 x 0.52 in (57.9 x 36.8 x 13.3)",
+     "95%",
+     "ADQ600-48S10B-6L"
+    ],
+    [
+     "12 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "25 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.36 in (57.9 x 36.8 x 9.6)",
+     "94%",
+     "AVQ300-48S12-6L"
+    ],
+    [
+     "",
+     "33 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.36 in (57.9 x 36.8 x 9.6)",
+     "93%",
+     "AVQ400-48S12-6L"
+    ],
+    [
+     "",
+     "42 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.43 in (57.9 x 36.8 x 11)",
+     "95%",
+     "ADQ500-48S12-6L"
+    ],
+    [
+     "",
+     "50 A",
+     "48 V (40 to 60 V)",
+     "2.28 x 1.45 x 0.43 in (57.9 x 36.8 x 11)",
+     "95%",
+     "ADQ600-48S12-6L"
+    ],
+    [
+     "",
+     "58 A",
+     "48 V (40 to 60 V)",
+     "2.3 x 1.4 x 0.43 in (58.4 x 36.8 x 11)",
+     "96%",
+     "ADQ700-48S12-4L"
+    ],
+    [
+     "",
+     "58 A",
+     "48 V (40 to 60 V)",
+     "2.3 x 1.4 x 0.43 in (58.4 x 36.8 x 11)",
+     "96%",
+     "ADQ700-48S12-4LI"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "25 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.50 in (57.9 x 36.8 x 12.7)",
+     "94%",
+     "AVQ300-48S12B-4L"
+    ],
+    [
+     "",
+     "33 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.50 in (57.9 x 36.8 x 12.7)",
+     "93%",
+     "AVQ400-48S12B-6L"
+    ],
+    [
+     "",
+     "42 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.43 in (57.9 x 36.8 x 11)",
+     "95%",
+     "ADQ500-48S12B-6L"
+    ],
+    [
+     "",
+     "50 A",
+     "48 V (40 to 60 V)",
+     "2.28 x 1.45 x 0.52 in (57.9 x 36.8 x 13.3)",
+     "95%",
+     "ADQ600-48S12B-6L"
+    ],
+    [
+     "",
+     "50 A",
+     "48 V (36 to 75 V)",
+     "2.28 x 1.45 x 0.43 in (57.9 x 36.8 x 11)",
+     "95.5%",
+     "ADQ600B-48S12B-6L/K"
+    ],
+    [
+     "",
+     "58 A",
+     "48 V (40 to 60 V)",
+     "2.3 x 1.4 x 0.52 in (58.4 x 36.8 x 13.6)",
+     "96%",
+     "ADQ700-48S12B-4L"
+    ],
+    [
+     "",
+     "58 A",
+     "48 V (40 to 60 V)",
+     "2.3 x 1.4 x 0.52 in (58.4 x 36.8 x 13.6)",
+     "96%",
+     "ADQ700-48S12B-4LI"
+    ],
+    [
+     "",
+     "70 A",
+     "48 V (40 to 60 V)",
+     "2.3 x 1.4 x 0.53 in (58.4 x 36.8 x 13.6)",
+     "96%",
+     "ADQ800-48S12B-4L"
+    ],
+    [
+     "",
+     "90 A",
+     "48 V (40 to 60 V)",
+     "2.3 x 1.4 x 0.57 in (58.4 x 36.8 x 14.5)",
+     "97.7%",
+     "BCQ1300-48S12B-4L"
+    ],
+    [
+     "",
+     "90 A",
+     "48 V (40 to 60 V)",
+     "2.3 x 1.4 x 0.57 in (58.4 x 36.8 x 14.5)",
+     "97.5%",
+     "BDQ1300-48S12B-4L"
+    ],
+    [
+     "",
+     "90 A",
+     "48 V (40 to 60 V)",
+     "2.3 x 1.4 x 0.57 in (58.4 x 36.8 x 14.5)",
+     "97.5%",
+     "BDQ1300-48S12B-4LI"
+    ]
+   ],
+   "partNumbers": [
+    "3.3 V"
+   ]
+  },
+  {
+   "page": 121,
+   "section": "Eighth-Brick",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package L x W x H (mm)",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "1.2 V",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "50 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.5 in (57.9 x 22.9 x 12.7)",
+     "85.5%",
+     "AVO100-48S1V2B-6L"
+    ],
+    [
+     "3.3 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "15 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.38 in (57.9 x 22.9 x 9.6)",
+     "90%",
+     "AVO50C-48S3V3-6"
+    ],
+    [
+     "",
+     "20 A",
+     "24 V/48 V (19 to 60 V)",
+     "2.3 x 0.9 x 0.32 in (57.9 x 22.9 x 8.13)",
+     "91%",
+     "ALO20F36N-L"
+    ],
+    [
+     "",
+     "30 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.38 in (57.9 x 22.9 x 9.6)",
+     "91%",
+     "AVO100B-48S3V3-6L"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.44 in (58.4 x 22.9 x 11.2)",
+     "93.5%",
+     "ADO300-48S3V3-6L"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.44 in (58.4 x 22.9 x 11.2)",
+     "93.5%",
+     "ADO300-48S3V3-6LI"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "30 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.4 in (57.9 x 22.9 x 10.16)",
+     "91%",
+     "AVO100C-48S3V3B-4L"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.53 in (58.4 x 22.9 x 13.5)",
+     "93.5%",
+     "ADO300-48S3V3B-6L"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.53 in (58.4 x 22.9 x 13.5)",
+     "93.5%",
+     "ADO300-48S3V3B-6LI"
+    ]
+   ],
+   "partNumbers": [
+    "1.2 V",
+    "3.3 V"
+   ]
+  },
+  {
+   "page": 122,
+   "section": "Eighth-Brick",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package L x W x H (mm)",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "5 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "20 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.38 in (57.9 x 22.9 x 9.6)",
+     "92.8%",
+     "AVO100-48S05-6L"
+    ],
+    [
+     "",
+     "40 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.38 in (57.9 x 22.9 x 9.6)",
+     "94%",
+     "AVO200-48S05-6L"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.44 in (58.4 x 22.9 x 11.2)",
+     "95%",
+     "ADO300-48S05-6L"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.44 in (58.4 x 22.9 x 11.2)",
+     "95%",
+     "ADO300-48S05-6LI"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "20 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.5 in (57.9 x 22.9 x 12.7)",
+     "92.8%",
+     "AVO100-48S05B-6L"
+    ],
+    [
+     "",
+     "40 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.5 in (57.9 x 22.9 x 12.7)",
+     "94%",
+     "AVO200-48S05B-6L"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.53 in (58.4 x 22.9 x 13.5)",
+     "95%",
+     "ADO300-48S05B-6L"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.53 in (58.4 x 22.9 x 13.5)",
+     "95%",
+     "ADO300-48S05B-6LI"
+    ],
+    [
+     "",
+     "60 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.53 in (58.4 x 22.9 x 13.5)",
+     "95%",
+     "ADO300-48S05PB-6L"
+    ],
+    [
+     "",
+     "50 A",
+     "48 V (45 to 56 V)",
+     "2.3 x 0.91 x 0.48 in (58.4 x 23.2 x 12.2)",
+     "96.5%",
+     "ADO500-48S10-4L"
+    ],
+    [
+     "",
+     "55 A",
+     "48 V (45 to 56 V)",
+     "2.3 x 0.91 x 0.57 in (58.4 x 23.2 x 14.5)",
+     "96.5%",
+     "ADO550-48S10B-4L"
+    ],
+    [
+     "12 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "10 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.38 in (57.9 x 22.9 x 9.6)",
+     "93%",
+     "AVO120-48S12-6L"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.38 in (57.9 x 22.9 x 9.6)",
+     "94%",
+     "AVO200-48S12-6L"
+    ],
+    [
+     "",
+     "20 A",
+     "48 V (41 to 75 V)",
+     "2.3 x 0.9 x 0.38 in (57.9 x 22.9 x 9.6)",
+     "94%",
+     "AVO240-48S12-6L"
+    ],
+    [
+     "",
+     "26 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.44 in (57.9 x 22.9 x 11.2)",
+     "95%",
+     "ADO300-48S12-6L"
+    ],
+    [
+     "",
+     "26 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.44 in (57.9 x 22.9 x 11.2)",
+     "95%",
+     "ADO300-48S12-6LI"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "10 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.5 in (57.9 x 22.9 x 12.7)",
+     "93%",
+     "AVO120-48S12B-6L"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.5 in (57.9 x 22.9 x 12.7)",
+     "94%",
+     "AVO200-48S12B-6L"
+    ],
+    [
+     "",
+     "20 A",
+     "48 V (41 to 75 V)",
+     "2.3 x 0.9 x 0.5 in (57.9 x 22.9 x 12.7)",
+     "94%",
+     "AVO240-48S12B-6L"
+    ],
+    [
+     "",
+     "26 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.53 in (57.9 x 22.9 x 13.5)",
+     "95%",
+     "ADO300-48S12B-6L"
+    ],
+    [
+     "",
+     "26 A",
+     "48 V (36 to 75 V)",
+     "2.3 x 0.9 x 0.53 in (57.9 x 22.9 x 13.5)",
+     "95%",
+     "ADO300-48S12B-6LI"
+    ]
+   ],
+   "partNumbers": []
+  },
+  {
+   "page": 123,
+   "section": "Sixteenth-Brick",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package L x W x H (mm)",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "1.2 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "15 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.35 in (33 x 22.9 x 8.89)",
+     "84%",
+     "ALD15K48N-L"
+    ],
+    [
+     "",
+     "25 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.34 in (33 x 22.9 x 8.5)",
+     "84%",
+     "AVD75-48S1V2-6L"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "25 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.5 in (33 x 22.9 x 12.7)",
+     "84%",
+     "AVD75-48S1V2B-6L"
+    ],
+    [
+     "3.3 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "15 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.5)",
+     "91%",
+     "AVD50B-48S3V3-6L"
+    ],
+    [
+     "",
+     "20 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.39 in (33 x 22.9 x 10)",
+     "92%",
+     "AVD75-48S3V3-6L"
+    ],
+    [
+     "",
+     "23 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.36 in (33 x 22.9 x 9.2)",
+     "91.5%",
+     "AVD75B-48S3V3-6L"
+    ],
+    [
+     "",
+     "25 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.39 in (33 x 22.9 x 10)",
+     "92%",
+     "AVD85-48S3V3-6L"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "15 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.47 in (33 x 22.9 x 12)",
+     "92%",
+     "AVD50B-48S3V3B-6L"
+    ],
+    [
+     "",
+     "20 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.5 in (33 x 22.9 x 12.7)",
+     "92%",
+     "AVD75-48S3V3B-6L"
+    ],
+    [
+     "",
+     "23 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.47 in (33 x 22.9 x 12)",
+     "91.5%",
+     "AVD75B-48S3V3B-6L"
+    ],
+    [
+     "",
+     "25 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.5 in (33 x 22.9 x 12.7)",
+     "92%",
+     "AVD85-48S3V3B-6L"
+    ],
+    [
+     "",
+     "SMT pin with reel tape package",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "15 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.4)",
+     "92%",
+     "AVD50B-48S3V3TL"
+    ],
+    [
+     "",
+     "23 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.4)",
+     "91.5%",
+     "AVD75B-48S3V3TL"
+    ]
+   ],
+   "partNumbers": [
+    "1.2 V",
+    "3.3 V"
+   ]
+  },
+  {
+   "page": 124,
+   "section": "Sixteenth-Brick",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package L x W x H (mm)",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "5 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "7 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.35 in (33 x 22.9 x 8.89)",
+     "91%",
+     "ALD07A48N-L"
+    ],
+    [
+     "",
+     "10 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.36 in (33 x 22.9 x 9.2)",
+     "91.5%",
+     "AVD50B-48S05-6L"
+    ],
+    [
+     "",
+     "10 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.5)",
+     "92%",
+     "AVD50-48S05-6L"
+    ],
+    [
+     "",
+     "15 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.36 in (33 x 22.9 x 9.2)",
+     "91.5%",
+     "AVD75B-48S05-6L"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.36 in (33 x 22.9 x 9.2)",
+     "91.5%",
+     "AVD85B-48S05-6L"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.39 in (33 x 22.9 x 10)",
+     "92%",
+     "AVD85-48S05-6L"
+    ],
+    [
+     "",
+     "20 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.39 in (33 x 22.9 x 10)",
+     "92%",
+     "AVD100-48S05-6L"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "10 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.47 in (33 x 22.9 x 12)",
+     "91.5%",
+     "AVD50B-48S05B-6L"
+    ],
+    [
+     "",
+     "15 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.47 in (33 x 22.9 x 12)",
+     "91.5%",
+     "AVD75B-48S05B-6L"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.47 in (33 x 22.9 x 12)",
+     "91.5%",
+     "AVD85B-48S05B-6L"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.5 in (33 x 22.9 x 12.7)",
+     "92%",
+     "AVD85-48S05B-6L"
+    ],
+    [
+     "",
+     "20 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.5 in (33 x 22.9 x 12.7)",
+     "92%",
+     "AVD100-48S05B-6L"
+    ],
+    [
+     "",
+     "SMT pin with reel tape package",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "10 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.4)",
+     "91.5%",
+     "AVD50B-48S05TL"
+    ],
+    [
+     "",
+     "15 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.4)",
+     "91.5%",
+     "AVD75B-48S05TL"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.4)",
+     "91.5%",
+     "AVD85B-48S05TL"
+    ],
+    [
+     "12 V",
+     "Open-frame",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "2.75 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.35 in (33 x 22.9 x 8.89)",
+     "92%",
+     "ALD03B48N-L"
+    ],
+    [
+     "",
+     "4.17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.36 in (33 x 22.9 x 9.2)",
+     "93%",
+     "AVD50B-48S12-6L"
+    ],
+    [
+     "",
+     "6.25 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.36 in (33 x 22.9 x 9.2)",
+     "93.3%",
+     "AVD75B-48S12-6L"
+    ],
+    [
+     "",
+     "7 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.39 in (33 x 22.9 x 10)",
+     "92%",
+     "AVD85-48S12-6L"
+    ],
+    [
+     "",
+     "7.1 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.36 in (33 x 22.9 x 9.2)",
+     "93.3%",
+     "AVD85B-48S12-6L"
+    ],
+    [
+     "",
+     "10 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.39 in (33 x 22.9 x 10)",
+     "92%",
+     "AVD120-48S12-6L"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.43 in (33 x 22.9 x 10.9)",
+     "94.2%",
+     "AVD200-48S12-6L"
+    ],
+    [
+     "",
+     "Baseplate",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "4.17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.47 in (33 x 22.9 x 12)",
+     "93%",
+     "AVD50B-48S12B-6L"
+    ],
+    [
+     "",
+     "6.25 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.47 in (33 x 22.9 x 12)",
+     "93.3%",
+     "AVD75B-48S12B-6L"
+    ],
+    [
+     "",
+     "7 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.5 in (33 x 22.9 x 12.7)",
+     "92%",
+     "AVD85-48S12B-6L"
+    ],
+    [
+     "",
+     "7.1 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.47 in (33 x 22.9 x 12)",
+     "93.3%",
+     "AVD85B-48S12B-6L"
+    ],
+    [
+     "",
+     "10 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.5 in (33 x 22.9 x 12.7)",
+     "92%",
+     "AVD120-48S12B-6L"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.5 in (33 x 22.9 x 12.7)",
+     "94.2%",
+     "AVD200-48S12B-6L"
+    ],
+    [
+     "",
+     "SMT pin with reel tape package",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "4.17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.4)",
+     "93%",
+     "AVD50B-48S12TL"
+    ],
+    [
+     "",
+     "6.25 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.4)",
+     "93.3%",
+     "AVD75B-48S12TL"
+    ],
+    [
+     "",
+     "7.1 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.37 in (33 x 22.9 x 9.4)",
+     "93.3%",
+     "AVD85B-48S12TL"
+    ],
+    [
+     "",
+     "17 A",
+     "48 V (36 to 75 V)",
+     "1.3 x 0.9 x 0.43 in (33 x 22.9 x 10.9)",
+     "94.2%",
+     "AVD200-48S12TL"
+    ]
+   ],
+   "partNumbers": []
+  },
+  {
+   "page": 126,
+   "section": "Direct Conversion – PSA Series",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "",
+    "",
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Efficiency",
+    "Package L x W x H (mm)",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "Quarter Brick",
+     "Baseplate",
+     "3.3 V",
+     "25 A",
+     "24 V, 48 V (18 to 60 V)",
+     "90% @ 48 vin, 92% @ 24 vin",
+     "2.28 x 1.45 x 0.40 in (57.9 x 36.8 x 10.2)",
+     "AVQ100-36S3V3B-6L"
+    ],
+    [
+     "Quarter Brick",
+     "Baseplate",
+     "12 V",
+     "19 A",
+     "24 V, 48 V (18 to 75 V)",
+     "94%",
+     "2.28 x 1.45 x 0.50 in (57.9 x 36.8 x 12.7)",
+     "AVQ200-36S12B-6L"
+    ],
+    [
+     "Quarter Brick",
+     "Open-frame",
+     "3.3 V",
+     "25 A",
+     "24 V, 48 V (18 to 60 V)",
+     "90% @ 48 vin, 92% @ 24 vin",
+     "2.28 x 1.45 x 0.40 in (57.9 x 36.8 x 10.2)",
+     "AVQ100-36S3V3-6L"
+    ],
+    [
+     "Quarter Brick",
+     "Open-frame",
+     "12 V",
+     "19 A",
+     "24 V, 48 V (18 to 75 V)",
+     "94%",
+     "2.28 x 1.45 x 0.38 in (57.9 x 36.8 x 9.6)",
+     "AVQ200-36S12-6L"
+    ]
+   ],
+   "partNumbers": [
+    "Quarter Brick",
+    "Quarter Brick",
+    "Quarter Brick",
+    "Quarter Brick"
+   ]
+  },
+  {
+   "page": 126,
+   "section": "Direct Conversion – PSA Series",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Input Voltage",
+    "Vout",
+    "Iout",
+    "Efficiency",
+    "Package L x W x H (mm)",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "40 to 60 VDC",
+     "1.6 to 2.0 V",
+     "100 A",
+     "92%",
+     "1.18 x 0.5 x 0.67 in (30 x 12.7 x 17)",
+     "ADC100M-04Y"
+    ],
+    [
+     "40 to 60 VDC",
+     "1.6 to 2.0 V",
+     "100 A",
+     "92%",
+     "1.18 x 0.5 x 0.59 in (30 x 12.7 x 15)",
+     "ADC100S-04Y"
+    ],
+    [
+     "40 to 60 VDC",
+     "0.8 to 1.1 V",
+     "120 A",
+     "91%",
+     "1.18 x 0.5 x 0.67 in (30 x 12.7 x 17)",
+     "ADC100M-04J"
+    ],
+    [
+     "40 to 60 VDC",
+     "0.8 to 1.1 V",
+     "120 A",
+     "91%",
+     "1.18 x 0.5 x 0.59 in (30 x 12.7 x 15)",
+     "ADC100S-04J"
+    ]
+   ],
+   "partNumbers": []
+  },
+  {
+   "page": 127,
+   "section": "C-Class",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Output Current",
+    "Input Voltage",
+    "Output Voltage",
+    "Efficiency",
+    "Package L x W x H (mm)",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "Single-In-Line, Through-Hole Mounting",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "3 A",
+     "3.0 to 13.8 VDC",
+     "0.59 to 5.1 V",
+     "90%",
+     "0.37 x 0.21 x 0.61 in (9.4 x 5.33 x 15.49)",
+     "LDO03C-005W05-VJ"
+    ],
+    [
+     "6 A",
+     "3.0 to 13.8 VDC",
+     "0.59 to 5.1 V",
+     "92%",
+     "0.41 x 0.37 x 0.65 in (10.41 x 9.4 x 16.51)",
+     "LDO06C-005W05-VJ"
+    ],
+    [
+     "10 A",
+     "3.0 to 13.8 VDC",
+     "0.59 to 5.1 V",
+     "94%",
+     "0.41 x 0.45 x 0.65 in (10.41 x 11.43 x 16.51)",
+     "LDO10C-005W05-VJ"
+    ],
+    [
+     "20 A",
+     "4.5 to 13.8 VDC",
+     "0.59 to 5.1 V",
+     "93%",
+     "1.2 x 0.46 x 0.61 in (30.48 x 11.68 x 15.49)",
+     "SIL20C2-00SADJ-VJ"
+    ],
+    [
+     "Surface-Mounting",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "3 A",
+     "3.0 to 13.8 VDC",
+     "0.59 to 5.1 V",
+     "90%",
+     "0.61 x 0.37 x 0.29 in (15.49 x 9.4 x 7.37)",
+     "LDO03C-005W05-SJ"
+    ],
+    [
+     "6 A",
+     "3.0 to 13.8 VDC",
+     "0.59 to 5.1 V",
+     "92%",
+     "0.65 x 0.41 x 0.44 in (16.51 x 10.41 x 11.18)",
+     "LDO06C-005W05-SJ"
+    ],
+    [
+     "10 A",
+     "3.0 to 13.8 VDC",
+     "0.59 to 5.1 V",
+     "94%",
+     "0.65 x 0.41 x 0.52 in (16.51 x 10.41 x 13.21)",
+     "LDO10C-005W05-SJ"
+    ],
+    [
+     "20 A",
+     "4.5 to 13.8 VDC",
+     "0.59 to 5.1 V",
+     "93%",
+     "1.2 x 0.61 x 0.48 in (30.48 x 15.49 x 12.19)",
+     "SMT20C2-00SADJJ"
+    ]
+   ],
+   "partNumbers": [
+    "Single-In-Line, Through-Hole Mounting",
+    "Surface-Mounting"
+   ]
+  },
+  {
+   "page": 128,
+   "section": "LGA Series",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Output current",
+    "Input voltage",
+    "Output voltage",
+    "Efficiency",
+    "Package L x W x H (mm)",
+    "Model number"
+   ],
+   "rows": [
+    [
+     "Total current 50A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.48 in (25.4 x 12.7 x 12.2)",
+     "LGA50D-01DADJ"
+    ],
+    [
+     "Channel 1; 25A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.48 in (25.4 x 12.7 x 12.2)",
+     "LGA50D-01DADJ"
+    ],
+    [
+     "Channel 2; 25A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.48 in (25.4 x 12.7 x 12.2)",
+     "LGA50D-01DADJ"
+    ],
+    [
+     "Total current 50A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.41 in (25.4 x 12.7 x 10.6)",
+     "LGA50D-01DADJSBJ"
+    ],
+    [
+     "Channel 1; 25A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.41 in (25.4 x 12.7 x 12.2)",
+     "LGA50D-01DADJSBJ"
+    ],
+    [
+     "Channel 2; 25A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.41 in (25.4 x 12.7 x 12.2)",
+     "LGA50D-01DADJSBJ"
+    ],
+    [
+     "Total current 50A",
+     "7.5 to 14 VDC",
+     "0.6 to 3.3V",
+     "91.1%",
+     "1 x 0.5 x 0.23 in (25.4 x 12.7 x 5.85)",
+     "LGA50D-01DADJLPJ"
+    ],
+    [
+     "Channel 1; 25A",
+     "7.5 to 14 VDC",
+     "0.6 to 3.3V",
+     "91.1%",
+     "1 x 0.5 x 0.23 in (25.4 x 12.7 x 5.85)",
+     "LGA50D-01DADJLPJ"
+    ],
+    [
+     "Channel 2; 25A",
+     "7.5 to 14 VDC",
+     "0.6 to 3.3V",
+     "91.1%",
+     "1 x 0.5 x 0.23 in (25.4 x 12.7 x 5.85)",
+     "LGA50D-01DADJLPJ"
+    ],
+    [
+     "Total current 80A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.48 in (25.4 x 12.7 x 12.2)",
+     "LGA80D-01DADJJ"
+    ],
+    [
+     "Channel 1; 40A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.48 in (25.4 x 12.7 x 12.2)",
+     "LGA80D-01DADJJ"
+    ],
+    [
+     "Channel 2; 40A",
+     "7.5 to 14 VDC",
+     "0.6 to 5.2V",
+     "95.5%",
+     "1 x 0.5 x 0.48 in (25.4 x 12.7 x 12.2)",
+     "LGA80D-01DADJJ"
+    ],
+    [
+     "Total output 110A",
+     "7.5 to 14 VDC",
+     "0.5V to 5V",
+     "96%",
+     "1.08 x 0.5 x 0.52 in (27.5 x 12.8 x 13.4)",
+     "LGA110D-01DADJJ"
+    ],
+    [
+     "Channel 1; 55A",
+     "7.5 to 14 VDC",
+     "0.5V to 5V",
+     "96%",
+     "1.08 x 0.5 x 0.52 in (27.5 x 12.8 x 13.4)",
+     "LGA110D-01DADJJ"
+    ],
+    [
+     "Channel 2; 55A",
+     "7.5 to 14 VDC",
+     "0.5V to 5V",
+     "96%",
+     "1.08 x 0.5 x 0.52 in (27.5 x 12.8 x 13.4)",
+     "LGA110D-01DADJJ"
+    ]
+   ],
+   "partNumbers": [
+    "Total current 50A",
+    "Channel 1; 25A",
+    "Channel 2; 25A",
+    "Total current 50A",
+    "Channel 1; 25A",
+    "Channel 2; 25A",
+    "Total current 50A",
+    "Channel 1; 25A",
+    "Channel 2; 25A",
+    "Total current 80A",
+    "Channel 1; 40A",
+    "Channel 2; 40A",
+    "Total output 110A",
+    "Channel 1; 55A",
+    "Channel 2; 55A"
+   ]
+  },
+  {
+   "page": 129,
+   "section": "LGA Series",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Output Current",
+    "Input Voltage",
+    "Output Voltage",
+    "Efficiency",
+    "Package L x W x H (mm)",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "Surface-Mounting",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "3 A",
+     "3.0 to 14 VDC",
+     "0.59 to 5.1 V",
+     "92%",
+     "0.65 x 0.65 x 0.129 in (16.51 x 16.51 x 3.27)",
+     "LGA03C-00SADJJ"
+    ],
+    [
+     "6 A",
+     "3.0 to 14 VDC",
+     "0.59 to 5.1 V",
+     "92%",
+     "0.65 x 0.65 x 0.129 in (16.51 x 16.51 x 3.27)",
+     "LGA06C-00SADJJ"
+    ],
+    [
+     "10 A",
+     "3.0 to 14 VDC",
+     "0.59 to 5.1 V",
+     "92%",
+     "0.65 x 0.65 x 0.129 in (16.51 x 16.51 x 3.27)",
+     "LGA10C-00SADJJ"
+    ],
+    [
+     "20 A",
+     "4.5 to 14 VDC",
+     "0.59 to 5.1 V",
+     "91%",
+     "0.65 x 0.65 x 0.210 in (16.51 x 16.51 x 5.33)",
+     "LGA20C-01SADJJ"
+    ]
+   ],
+   "partNumbers": [
+    "Surface-Mounting"
+   ]
+  },
+  {
+   "page": 130,
+   "section": "Digital DC-DC Converters",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package size",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "12 VDC",
+     "26 A",
+     "48 V (36 to 75 V)",
+     "Eighth brick",
+     "95%",
+     "ADO300-48S12-6LI"
+    ],
+    [
+     "",
+     "26 A",
+     "48 V (36 to 75 V)",
+     "Eighth brick",
+     "95%",
+     "ADO300-48S12B-6LI"
+    ],
+    [
+     "",
+     "42 A",
+     "48 V (36 to 75 V)",
+     "Quarter brick",
+     "95%",
+     "ADQ500-48S12-6LI"
+    ],
+    [
+     "",
+     "42 A",
+     "48 V (36 to 75 V)",
+     "Quarter brick",
+     "95%",
+     "ADQ500-48S12B-6LI"
+    ],
+    [
+     "",
+     "58 A",
+     "48 V (40 to 60 V)",
+     "Quarter brick",
+     "96%",
+     "ADQ700-48S12-LI"
+    ],
+    [
+     "",
+     "58 A",
+     "48 V (40 to 60 V)",
+     "Quarter brick",
+     "96%",
+     "ADQ700-48S12B-6LI"
+    ],
+    [
+     "",
+     "90 A",
+     "48 V (40 to 60 V)",
+     "Quarter brick",
+     "97.5%",
+     "BDQ1300-48S12B-4LI"
+    ]
+   ],
+   "partNumbers": []
+  },
+  {
+   "page": 130,
+   "section": "Digital DC-DC Converters",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package size",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "12.25 VDC",
+     "73.7 A",
+     "48 V (40 to 60 V)",
+     "Quarter brick",
+     "96.7%",
+     "NDQ900-48S12B-6LI"
+    ],
+    [
+     "12.15 VDC",
+     "107 A",
+     "48 V (40 to 60 V)",
+     "Quarter brick",
+     "97.7%",
+     "NDQ1300-48S12B-6LI"
+    ],
+    [
+     "12.15 VDC",
+     "132 A",
+     "48 V (40 to 60 V)",
+     "Quarter brick",
+     "97.7%",
+     "NDQ1600-48S12B-6LI"
+    ]
+   ],
+   "partNumbers": [
+    "12.25 VDC",
+    "12.15 VDC",
+    "12.15 VDC"
+   ]
+  },
+  {
+   "page": 132,
+   "section": "Power Factor Correction (PFC)",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package L x W x H (mm)",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "PFC Module - Baseplate",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "380 V",
+     "4.2 A",
+     "85 to 264 VAC",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "95%",
+     "AIF04ZPFC-01L"
+    ],
+    [
+     "380 V",
+     "4.2 A",
+     "85 to 264 VAC",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "95%",
+     "AIF04ZPFC-02L"
+    ],
+    [
+     "393 V",
+     "0.25 A",
+     "100 to 122 VAC",
+     "2.3 x 1.45 x 0.5 in (58.42 x 36.83 x 12.7)",
+     "90%",
+     "AIQ00ZPFC-01NL"
+    ],
+    [
+     "393 V",
+     "2.08 A",
+     "85 to 264 VAC",
+     "3.5 x 2.4 x 0.5 in (88.9 x 60.96 x 12.7)",
+     "93%",
+     "AIT02ZPFC-01NL"
+    ],
+    [
+     "400 V",
+     "6 A",
+     "85 to 264 VAC",
+     "4.6 x 2.4 x 0.55 in (116.8 x 60.96 x 13.95)",
+     "97%",
+     "AIF06ZPFC-01L"
+    ],
+    [
+     "400 V",
+     "6 A",
+     "85 to 264 VAC",
+     "4.6 x 2.4 x 0.55 in (116.8 x 60.96 x 13.95)",
+     "97%",
+     "AIF06ZPFC-02L"
+    ],
+    [
+     "390 V",
+     "2.82 A",
+     "90 to 264 VAC",
+     "2.3 x 2.4 x 0.52 in (58.42 x 60.96 x 13.3)",
+     "97.3%",
+     "AIH03ZPFC-01L"
+    ]
+   ],
+   "partNumbers": [
+    "PFC Module - Baseplate"
+   ]
+  },
+  {
+   "page": 132,
+   "section": "Power Factor Correction (PFC)",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "",
+    "Vout",
+    "Iout",
+    "Input Voltage",
+    "Package L x W x H (mm)",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "AIF 300 Vin",
+     "Full-Brick – Baseplate",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "1.8 V",
+     "120 A",
+     "300 V (250 to 420 V)",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "80%",
+     "AIF120Y300-L"
+    ],
+    [
+     "",
+     "3.3 V",
+     "120 A",
+     "300 V (250 to 420 V)",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "87%",
+     "AIF120F300-L"
+    ],
+    [
+     "",
+     "5 V",
+     "80 A",
+     "300 V (250 to 420 V)",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "90%",
+     "AIF80A300-L"
+    ],
+    [
+     "",
+     "12 V",
+     "50 A",
+     "300 V (250 to 420 V)",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "90%",
+     "AIF50B300-L"
+    ],
+    [
+     "",
+     "15 V",
+     "40 A",
+     "300 V (250 to 420 V)",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "90%",
+     "AIF40C300-L"
+    ],
+    [
+     "",
+     "24 V",
+     "25 A",
+     "300 V (250 to 420 V)",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "90%",
+     "AIF25H300-L"
+    ],
+    [
+     "",
+     "48 V",
+     "12 A",
+     "300 V (250 to 420 V)",
+     "4.6 x 2.4 x 0.5 in (116.84 x 60.96 x 12.7)",
+     "91%",
+     "AIF12W300-L"
+    ],
+    [
+     "AIH 300 Vin",
+     "Half-Brick – Baseplate",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "1.8 V",
+     "50 A",
+     "300 V (250 to 420 V)",
+     "2.3 x 2.4 x 0.5 in (58.42 x 60.96 x 12.7)",
+     "80%",
+     "AIH50Y300-L"
+    ],
+    [
+     "",
+     "3.3 V",
+     "50 A",
+     "300 V (250 to 420 V)",
+     "2.3 x 2.4 x 0.5 in (58.42 x 60.96 x 12.7)",
+     "85%",
+     "AIH50F300-L"
+    ],
+    [
+     "",
+     "5 V",
+     "40 A",
+     "300 V (250 to 420 V)",
+     "2.3 x 2.4 x 0.5 in (58.42 x 60.96 x 12.7)",
+     "88%",
+     "AIH40A300-L"
+    ],
+    [
+     "",
+     "12 V",
+     "20 A",
+     "300 V (250 to 420 V)",
+     "2.3 x 2.4 x 0.5 in (58.42 x 60.96 x 12.7)",
+     "90%",
+     "AIH20B300-L"
+    ],
+    [
+     "",
+     "15 V",
+     "16 A",
+     "300 V (250 to 420 V)",
+     "2.3 x 2.4 x 0.5 in (58.42 x 60.96 x 12.7)",
+     "90%",
+     "AIH16C300-L"
+    ],
+    [
+     "",
+     "24 V",
+     "10 A",
+     "300 V (250 to 420 V)",
+     "2.3 x 2.4 x 0.5 in (58.42 x 60.96 x 12.7)",
+     "90%",
+     "AIH10H300-L"
+    ],
+    [
+     "AIQ 300 Vin",
+     "Quarter-Brick – Baseplate",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "",
+     "28 V",
+     "2.32 A",
+     "300 V (250 to 420 V)",
+     "2.3 x 1.45 x 0.5 in (58.42 x 36.83 x 12.7)",
+     "89%",
+     "AIQ02R300L"
+    ]
+   ],
+   "partNumbers": [
+    "AIF 300 Vin",
+    "AIH 300 Vin",
+    "AIQ 300 Vin"
+   ]
+  },
+  {
+   "page": 133,
+   "section": "Full Brick AC-DC Converter",
+   "sectionCategory": "DC-DC",
+   "sectionLineage": "LOW VOLTAGE",
+   "title": "Ordering Information",
+   "headers": [
+    "Vout",
+    "Iout",
+    "Ripple/Noise",
+    "Output Adjustment Range",
+    "Efficiency",
+    "Model Number"
+   ],
+   "rows": [
+    [
+     "AIF-500 Series",
+     "",
+     "",
+     "",
+     "",
+     ""
+    ],
+    [
+     "12 V",
+     "42 A",
+     "120 mV pk-pk",
+     "±10% Vout (10.8 to 13.2 VDC)",
+     "93%",
+     "AIF42BAC-01NT"
+    ],
+    [
+     "24 V",
+     "21 A",
+     "240 mV pk-pk",
+     "-10% to +12% Vout (21.6 to 26.88 VDC)",
+     "93%",
+     "AIF21HAC-01NT"
+    ],
+    [
+     "28 V",
+     "18 A",
+     "280 mV pk-pk",
+     "-5% to +18% Vout (26.6 to 33.04 VDC)",
+     "93%",
+     "AIF18RAC-01NT"
+    ],
+    [
+     "48 V",
+     "10.5 A",
+     "480 mV pk-pk",
+     "-8.3% to +17.9% Vout (44 to 56.6 VDC)",
+     "93%",
+     "AIF11WAC-01NT"
+    ],
+    [
+     "48 V",
+     "12.8 A",
+     "480 mV pk-pk",
+     "-8.3% to +17.9% Vout (44 to 56.6 VDC)",
+     "93%",
+     "AIF13WAC-01NT"
+    ]
+   ],
+   "partNumbers": [
+    "AIF-500 Series"
+   ]
+  }
+ ],
+ "index": {
+  "LCC250-12U-4P": [
+   19
+  ],
+  "LCC250-12U-4PE3": [
+   19
+  ],
+  "LCC250-12U-7P": [
+   19
+  ],
+  "LCC250-12U-7PE3": [
+   19
+  ],
+  "LCC250-24U-4P": [
+   19
+  ],
+  "LCC250-24U-4PE3": [
+   19
+  ],
+  "LCC250-24U-7P": [
+   19
+  ],
+  "LCC250-24U-7PE3": [
+   19
+  ],
+  "LCC250-48U-4P": [
+   19
+  ],
+  "LCC250-48U-4PE3": [
+   19
+  ],
+  "LCC250-48U-7P": [
+   19
+  ],
+  "LCC250-48U-7PE3": [
+   19
+  ],
+  "LCC600-48U-9P": [
+   21
+  ],
+  "LCC600-48H-9P": [
+   21
+  ],
+  "LCC600-36U-9P": [
+   21
+  ],
+  "LCC600-36H-9P": [
+   21
+  ],
+  "LCC600-28U-9P": [
+   21
+  ],
+  "LCC600-28H-9P": [
+   21
+  ],
+  "LCC600-12U-9P": [
+   21
+  ],
+  "LCC600-12H-9P": [
+   21
+  ],
+  "LCC1200-28U-4P": [
+   23
+  ],
+  "LCC1200-28U-9P": [
+   23
+  ],
+  "LCC1200-28U-4P24": [
+   23
+  ],
+  "LCC1200-28U-9P24": [
+   23
+  ],
+  "LCC1200-48U-4P": [
+   23
+  ],
+  "LCC1200-48U-9P": [
+   23
+  ],
+  "XgB": [
+   47
+  ],
+  "XgC": [
+   47
+  ],
+  "XgD": [
+   47
+  ],
+  "XgE/Xg7": [
+   47
+  ],
+  "XgF/Xg8 (v1)": [
+   47
+  ],
+  "(v2)": [
+   47
+  ],
+  "XgG": [
+   47
+  ],
+  "XgH": [
+   47
+  ],
+  "XgJ": [
+   47
+  ],
+  "XgK": [
+   47
+  ],
+  "XgL": [
+   47
+  ],
+  "Xg1": [
+   47
+  ],
+  "Xg2": [
+   47
+  ],
+  "Xg3": [
+   47
+  ],
+  "Xg4": [
+   47
+  ],
+  "Xg5": [
+   47
+  ],
+  "XgM": [
+   47
+  ],
+  "XgN": [
+   47
+  ],
+  "XgP": [
+   47
+  ],
+  "XgQ": [
+   47
+  ],
+  "XgR": [
+   47
+  ],
+  "XgT": [
+   47
+  ],
+  "Case": [
+   62
+  ],
+  "NP05/08": [
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62
+  ],
+  "NP08": [
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62,
+   62
+  ],
+  "WW = Number of Slots - Case Size 05 = 5 Slots 08 = 8 Slots X = Input Voltage Range W = Wide range 90 to 264 VAC H = High line L = Low line Y = Input Phase 1 = Single phase Z = Input Line A = AC input": [
+   63
+  ],
+  "iHP**XYZA-": [
+   71
+  ],
+  "Case Decoder": [
+   71
+  ],
+  "** = Case Power": [
+   71
+  ],
+  "X = Voltage Range": [
+   71
+  ],
+  "Y = Input Phase": [
+   71
+  ],
+  "Z = Cooling": [
+   71
+  ],
+  "A = Accessory Options": [
+   71
+  ],
+  "73-779-008": [
+   73
+  ],
+  "73-779-007": [
+   73
+  ],
+  "73-779-006": [
+   73
+  ],
+  "73-779-005": [
+   73
+  ],
+  "73-779-004": [
+   73
+  ],
+  "73-779-003": [
+   73
+  ],
+  "73-779-002": [
+   73
+  ],
+  "73-779-001": [
+   73
+  ],
+  "73-779-000": [
+   73
+  ],
+  "73-779-TBD": [
+   73
+  ],
+  "LCM300N": [
+   75
+  ],
+  "LCM300Q": [
+   75
+  ],
+  "LCM300U": [
+   75
+  ],
+  "LCM300W": [
+   75
+  ],
+  "LCM600N": [
+   77
+  ],
+  "LCM600Q": [
+   77
+  ],
+  "LCM600U": [
+   77
+  ],
+  "LCM600W": [
+   77
+  ],
+  "LCM1000N": [
+   79
+  ],
+  "LCM1000Q": [
+   79
+  ],
+  "LCM1000U": [
+   79
+  ],
+  "LCM1000W": [
+   79
+  ],
+  "LCM1500N": [
+   81
+  ],
+  "LCM1500Q": [
+   81
+  ],
+  "LCM1500R": [
+   81
+  ],
+  "LCM1500U": [
+   81
+  ],
+  "LCM1500W": [
+   81
+  ],
+  "LCM3000L-T": [
+   83
+  ],
+  "LCM30008-T": [
+   83
+  ],
+  "LCM3000Q-T": [
+   83
+  ],
+  "LCM3000U-T": [
+   83
+  ],
+  "LCM3000W-T": [
+   83
+  ],
+  "LCM30007-T": [
+   83
+  ],
+  "TF800 Series": [
+   85
+  ],
+  "TF800A12K": [
+   85
+  ],
+  "TF800A15K": [
+   85
+  ],
+  "TF800A24K": [
+   85
+  ],
+  "TF800A48K": [
+   85
+  ],
+  "TF800A60K": [
+   85
+  ],
+  "TF1500 Series": [
+   85
+  ],
+  "TF1500A12K": [
+   85
+  ],
+  "TF1500A15K": [
+   85
+  ],
+  "TF1500A24K": [
+   85
+  ],
+  "TF1500A48K": [
+   85
+  ],
+  "TF1500A60K": [
+   85
+  ],
+  "TF3000 Series": [
+   85
+  ],
+  "TF3000A12K": [
+   85
+  ],
+  "TF3000A15K": [
+   85
+  ],
+  "TF3000A24K": [
+   85
+  ],
+  "TF3000A48K": [
+   85
+  ],
+  "TF3000A60K": [
+   85
+  ],
+  "TF3000HV Series": [
+   85
+  ],
+  "TF3000A150K": [
+   85
+  ],
+  "TF3000A200K": [
+   85
+  ],
+  "TF3000A250K": [
+   85
+  ],
+  "TF3000A300K": [
+   85
+  ],
+  "TF3000A400K": [
+   85
+  ],
+  "Description": [
+   87
+  ],
+  "Standalone 4 kW module": [
+   87
+  ],
+  "Pluggable 4 kW module for shelf use": [
+   87
+  ],
+  "Model Number": [
+   87,
+   89,
+   89
+  ],
+  "LCM12K-SHF-N": [
+   87
+  ],
+  "LCM12K-SHF-P": [
+   87
+  ],
+  "LCM12K-SHF-S": [
+   87
+  ],
+  "LCM12K-BLK": [
+   87
+  ],
+  "FCM10KW-N-P": [
+   89
+  ],
+  "FCM10KW-N-T": [
+   89
+  ],
+  "FCM30KSHNW-PRM": [
+   89
+  ],
+  "FCM30KSHNW-TRM": [
+   89
+  ],
+  "FCM30KSHNW-PRN": [
+   89
+  ],
+  "FCM30KSHNW-TRN": [
+   89
+  ],
+  "FCM33K-SHF-L-W-T": [
+   91
+  ],
+  "FCM5K5W-N-P": [
+   91
+  ],
+  "LMD06Uvv#w012z": [
+   93
+  ],
+  "LMD06Uvv#w024z": [
+   93
+  ],
+  "LMD06Uvv#w036z": [
+   93
+  ],
+  "LMD10Uvv#w048z": [
+   93
+  ],
+  "LMD10Uvv#w060z": [
+   93
+  ],
+  "LMD10Uvv#w072z": [
+   93
+  ],
+  "LMD14Uvv#w084z": [
+   93
+  ],
+  "LMD14Uvv#w096z": [
+   93
+  ],
+  "LMD14Uvv#w108z": [
+   93
+  ],
+  "LMD18Uvv#w120z": [
+   93
+  ],
+  "xxx Cabinet Size": [
+   93
+  ],
+  "06U, 10U, 14U, 18U or 02U1": [
+   93
+  ],
+  "XS1000-24": [
+   95,
+   95
+  ],
+  "XS500-36": [
+   95,
+   95
+  ],
+  "XS1000-36": [
+   95,
+   95
+  ],
+  "XS500-48": [
+   95,
+   95
+  ],
+  "XS1000-48": [
+   95,
+   95
+  ],
+  "# of Slots": [
+   97
+  ],
+  "Total Power": [
+   97
+  ],
+  "HPS3000-9": [
+   97
+  ],
+  "700-015746-0100": [
+   110
+  ],
+  "700-015235-0100": [
+   110
+  ],
+  "700-015234-0100": [
+   111
+  ],
+  "700-037148-0100": [
+   112
+  ],
+  "700-037147-0100": [
+   113
+  ],
+  "700-15496-0000": [
+   114,
+   115
+  ],
+  "700-15485-0000": [
+   114,
+   115
+  ],
+  "700-15499-0000": [
+   114,
+   115
+  ],
+  "3.3 V": [
+   120,
+   121,
+   123
+  ],
+  "1.2 V": [
+   121,
+   123
+  ],
+  "Quarter Brick": [
+   126,
+   126,
+   126,
+   126
+  ],
+  "Single-In-Line, Through-Hole Mounting": [
+   127
+  ],
+  "Surface-Mounting": [
+   127,
+   129
+  ],
+  "Total current 50A": [
+   128,
+   128,
+   128
+  ],
+  "Channel 1; 25A": [
+   128,
+   128,
+   128
+  ],
+  "Channel 2; 25A": [
+   128,
+   128,
+   128
+  ],
+  "Total current 80A": [
+   128
+  ],
+  "Channel 1; 40A": [
+   128
+  ],
+  "Channel 2; 40A": [
+   128
+  ],
+  "Total output 110A": [
+   128
+  ],
+  "Channel 1; 55A": [
+   128
+  ],
+  "Channel 2; 55A": [
+   128
+  ],
+  "12.25 VDC": [
+   130
+  ],
+  "12.15 VDC": [
+   130,
+   130
+  ],
+  "PFC Module - Baseplate": [
+   132
+  ],
+  "AIF 300 Vin": [
+   132
+  ],
+  "AIH 300 Vin": [
+   132
+  ],
+  "AIQ 300 Vin": [
+   132
+  ],
+  "AIF-500 Series": [
+   133
+  ]
+ }
+}
