@@ -172,7 +172,14 @@ export async function POST(request: NextRequest) {
       const listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
       if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
 
+
       const html = await listResp.text();
+      // Log HTML structure on first page to discover mail view URL pattern
+      if (page === 0) {
+        const rowIdx = html.indexOf("row_id_");
+        const snippet = rowIdx >= 0 ? html.slice(Math.max(0, rowIdx - 50), rowIdx + 500) : html.slice(0, 500);
+        console.log(`[WEBMAIL] page0 html snippet: ${snippet.replace(/\n/g, " ").replace(/\s+/g, " ")}`);
+      }
       const msgs = parseMailList(html);
       console.log(`[WEBMAIL] page=${page} got=${msgs.length}`);
 

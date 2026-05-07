@@ -63,13 +63,31 @@ async function fetchBody(
   cookie: string,
   uid: string,
 ): Promise<{ htmlBody: string; body: string }> {
-  // Try the standard view URL
-  const viewUrl = `https://${host}/new_mailnara_web/index.php/mail/mail_view/Inbox/${uid}`;
-  const resp = await fetch(viewUrl, { headers: { Cookie: cookie } });
-  if (!resp.ok) throw new Error(`메일 본문 HTTP ${resp.status}`);
-  const html = await resp.text();
+  // Try multiple MAILNARA view URL patterns until one returns 200
+  const candidates = [
+    `https://${host}/new_mailnara_web/index.php/mail/view_mail/Inbox/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/mail/mail_read/Inbox/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/mail/read_mail/Inbox/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/mail/mail_content/Inbox/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/mail/mail_print/Inbox/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/mail/mail_source/Inbox/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/mail/mail_view/Inbox/${uid}`,
+  ];
 
-  console.log(`[WEBMAIL-THREAD] view HTML length=${html.length} first200=${html.slice(0, 200).replace(/\n/g, " ")}`);
+  let html = "";
+  let usedUrl = "";
+  for (const url of candidates) {
+    const r = await fetch(url, { headers: { Cookie: cookie } });
+    console.log(`[WEBMAIL-THREAD] try ${url.split("/").slice(-3).join("/")} → ${r.status}`);
+    if (r.ok) {
+      html = await r.text();
+      usedUrl = url;
+      break;
+    }
+  }
+  if (!html) throw new Error(`메일 본문을 가져올 수 없습니다 (모든 URL 패턴 실패)`);
+
+  console.log(`[WEBMAIL-THREAD] got html from ${usedUrl} len=${html.length} preview=${html.slice(0, 300).replace(/\n/g, " ").replace(/\s+/g, " ")}`);
 
   // 1) Look for iframe that holds the mail body
   const iframeMatch = html.match(

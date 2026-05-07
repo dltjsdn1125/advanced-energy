@@ -743,6 +743,8 @@ export default function OutlookPage() {
   // Background thread prefetch — warms server PS cache, no UI side-effects
   const prefetchingRef = useRef<Set<string>>(new Set());
   function prefetchThread(msg: OutlookMessage) {
+    // webmail/imap/pop3 messages can't use Outlook COM prefetch
+    if (msg.entryId.startsWith("web-") || msg.entryId.startsWith("imap-") || msg.entryId.startsWith("pop3-")) return;
     if (threadCache.current.has(msg.entryId)) return;
     if (prefetchingRef.current.has(msg.entryId)) return;
     prefetchingRef.current.add(msg.entryId);
