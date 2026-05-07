@@ -49,11 +49,77 @@ img{max-width:100%!important;height:auto!important;display:inline-block!importan
 </style>`;
 
 function injectFont(html: string, baseHref?: string): string {
-  const baseTag = baseHref ? `<base href="${baseHref}">` : "";
-  const inject  = baseTag + FONT_CSS;
-  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, inject + "</head>");
-  if (/<body/i.test(html)) return html.replace(/<body/i, inject + "<body");
-  return inject + html;
+  let result = html;
+
+  if (baseHref) {
+    if (/<base\b[^>]*>/i.test(result)) {
+      // Modify existing <base> tag — add href if missing, keep other attrs (e.g. target)
+      result = result.replace(/<base\b([^>]*)>/i, (_m, attrs: string) => {
+        if (/\bhref=/i.test(attrs)) return _m; // already has href, don't override
+        return `<base${attrs} href="${baseHref}">`;
+      });
+    } else {
+      const baseTag = `<base href="${baseHref}">`;
+      if (/<\/head>/i.test(result)) result = result.replace(/<\/head>/i, baseTag + "</head>");
+      else if (/<body/i.test(result)) result = result.replace(/<body/i, baseTag + "<body");
+      else result = baseTag + result;
+    }
+  }
+
+  if (/<\/head>/i.test(result)) return result.replace(/<\/head>/i, FONT_CSS + "</head>");
+  if (/<body/i.test(result)) return result.replace(/<body/i, FONT_CSS + "<body");
+  return FONT_CSS + result;
+}
+
+// Fetch relative/mail-server images and replace with base64 data URIs so
+// the browser can display them without needing the MAILNARA session cookie.
+async function inlineImages(html: string, host: string, cookie: string): Promise<string> {
+  const hostOrigin = `https://${host}`;
+  // Match src attributes that are relative or point to the same host
+  const pattern = /(<img\b[^>]*?\bsrc=["'])([^"']+)(["'][^>]*?>)/gi;
+  const toFetch: Array<{ tag: string; prefix: string; src: string; suffix: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(html)) !== null) {
+    const src = m[2];
+    // Skip data URIs, CID references, and external URLs not on this host
+    if (src.startsWith("data:") || src.startsWith("cid:")) continue;
+    const isRelative = !src.startsWith("http");
+    const isSameHost = src.startsWith(hostOrigin);
+    if (!isRelative && !isSameHost) continue;
+    toFetch.push({ tag: m[0], prefix: m[1], src, suffix: m[3] });
+  }
+  if (toFetch.length === 0) return html;
+
+  const MAX_IMAGES = 20;
+  const limited = toFetch.slice(0, MAX_IMAGES);
+
+  const replacements = await Promise.all(limited.map(async ({ tag, prefix, src, suffix }) => {
+    try {
+      const absUrl = src.startsWith("/") ? `${hostOrigin}${src}` : isSameHostUrl(src, hostOrigin) ? src : `${hostOrigin}/${src}`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const resp = await fetch(absUrl, { headers: { Cookie: cookie }, signal: controller.signal });
+      clearTimeout(timer);
+      if (!resp.ok) return { tag, replacement: tag };
+      const ct = resp.headers.get("content-type") ?? "image/png";
+      const buf = await resp.arrayBuffer();
+      const b64 = Buffer.from(buf).toString("base64");
+      const dataUri = `data:${ct};base64,${b64}`;
+      return { tag, replacement: prefix + dataUri + suffix };
+    } catch {
+      return { tag, replacement: tag };
+    }
+  }));
+
+  let result = html;
+  for (const { tag, replacement } of replacements) {
+    if (tag !== replacement) result = result.replace(tag, replacement);
+  }
+  return result;
+}
+
+function isSameHostUrl(src: string, hostOrigin: string): boolean {
+  return src.startsWith(hostOrigin);
 }
 
 function stripTags(html: string): string {
@@ -74,7 +140,9 @@ async function fetchBody(
   const html = await resp.text();
   console.log(`[WEBMAIL-THREAD] body html len=${html.length}`);
   const baseHref = `https://${host}/`;
-  return { htmlBody: injectFont(html, baseHref), body: stripTags(html).slice(0, 2000) };
+  // Inline relative images as data URIs so they load without the session cookie
+  const inlinedHtml = await inlineImages(html, host, cookie);
+  return { htmlBody: injectFont(inlinedHtml, baseHref), body: stripTags(html).slice(0, 2000) };
 }
 
 export async function POST(request: NextRequest) {
