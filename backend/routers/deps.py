@@ -33,9 +33,17 @@ async def get_current_user(
         email: str | None = payload.get("email")
         if not user_id:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        return {"user_id": user_id, "email": email}
+        user_metadata = payload.get("user_metadata", {}) or {}
+        is_admin = bool(user_metadata.get("is_admin", False))
+        return {"user_id": user_id, "email": email, "is_admin": is_admin}
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
+
+
+async def get_admin_user(user: dict = Depends(get_current_user)) -> dict:
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return user

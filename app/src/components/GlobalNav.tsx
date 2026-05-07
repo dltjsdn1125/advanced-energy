@@ -18,7 +18,7 @@ export default function GlobalNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const { user, signOut, loading } = useAuth();
+  const { user, signOut, loading, isAdmin } = useAuth();
 
   function isActive(href: string) {
     return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
@@ -54,6 +54,16 @@ export default function GlobalNav() {
         {/* Desktop user info */}
         {!loading && user && (
           <div className="hidden sm:flex items-center gap-2 ml-2">
+            {isAdmin && (
+              <Link href="/admin"
+                className={`flex h-7 items-center rounded px-2.5 text-[12px] font-medium transition-colors ${
+                  isActive("/admin")
+                    ? "bg-red-100 text-red-700 font-semibold"
+                    : "text-red-500 hover:bg-red-50 hover:text-red-700"
+                }`}>
+                Admin
+              </Link>
+            )}
             <span className="text-[11px] text-black/40 max-w-[160px] truncate">{user.email}</span>
             <button
               onClick={handleSignOut}
@@ -95,6 +105,12 @@ export default function GlobalNav() {
             <>
               <div className="mx-5 my-1 border-t border-black/8" />
               <div className="flex h-9 items-center px-5 text-[12px] text-black/40 truncate">{user.email}</div>
+              {isAdmin && (
+                <Link href="/admin" onClick={() => setOpen(false)}
+                  className="flex h-10 items-center px-5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors">
+                  Admin
+                </Link>
+              )}
               <button
                 onClick={handleSignOut}
                 className="flex h-10 w-full items-center px-5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors"

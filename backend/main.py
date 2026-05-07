@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import get_settings
-from routers import settings, reports, catalogue
+from routers import settings, reports, catalogue, admin
 
 app = FastAPI(title="Advanced Energy Internal API", version="1.0.0")
 
@@ -19,6 +19,7 @@ app.add_middleware(
 app.include_router(settings.router,  prefix="/settings",  tags=["settings"])
 app.include_router(reports.router,   prefix="/reports",   tags=["reports"])
 app.include_router(catalogue.router, prefix="/catalogue", tags=["catalogue"])
+app.include_router(admin.router,     prefix="/admin",     tags=["admin"])
 
 
 @app.get("/health")
