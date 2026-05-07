@@ -429,11 +429,14 @@ export default function OutlookPage() {
   const [iframeW,       setIframeW]       = useState<Record<number, number>>({});
 
   // In-memory caches — persist across re-renders, reset on hard reload
-  const msgCache       = useRef<Map<Folder, OutlookMessage[]>>(new Map());
-  const msgCacheTs     = useRef<Map<Folder, number>>(new Map());
-  const threadCache    = useRef<Map<string, ThreadMessage[]>>(new Map());
+  const msgCache        = useRef<Map<Folder, OutlookMessage[]>>(new Map());
+  const msgCacheTs      = useRef<Map<Folder, number>>(new Map());
+  const threadCache     = useRef<Map<string, ThreadMessage[]>>(new Map());
   // Ref so background async tasks can check the current folder without stale closure
-  const activeFolderRef = useRef<Folder>("inbox");
+  const activeFolderRef  = useRef<Folder>("inbox");
+  // Track which folders have been fully loaded (all pages) and which are currently loading
+  const fullyLoadedRef   = useRef<Set<Folder>>(new Set());
+  const bgLoadingRef     = useRef<Set<Folder>>(new Set());
 
   const persistMsgCache = useCallback(() => {
     try {
@@ -630,21 +633,29 @@ export default function OutlookPage() {
     };
 
     // ── Background webmail page loader (runs after page 0 is shown) ──────────
+    // startPage=0 → fresh load (will prepend new msgs, then append older ones)
+    // startPage>0 → continuation (append-only)
     const startBackgroundPages = (capturedFolder: Folder, startPage: number, initCookie: string) => {
+      if (bgLoadingRef.current.has(capturedFolder)) return; // already running
+      bgLoadingRef.current.add(capturedFolder);
       (async () => {
         let page   = startPage;
-        let cookie = initCookie;
+        let cookie = initCookie; // "" triggers fresh login on first request
         while (true) {
           try {
             const result = await fetchWebmailPage(capturedFolder, page, cookie);
             if (!result) break;
             cookie = result.sessionCookie || cookie;
             saveWebmailSession(cookie);
-            applyMerge(capturedFolder, result.messages, false);
-            if (!result.hasMore) break;
+            applyMerge(capturedFolder, result.messages, page === 0); // prepend only on p0
+            if (!result.hasMore) {
+              fullyLoadedRef.current.add(capturedFolder);
+              break;
+            }
             page++;
           } catch { break; }
         }
+        bgLoadingRef.current.delete(capturedFolder);
       })();
     };
 
@@ -690,20 +701,29 @@ export default function OutlookPage() {
       cached.slice(1, 6).forEach(m => prefetchThread(m));
 
       const age = Date.now() - (msgCacheTs.current.get(folder) ?? 0);
-      if (age < CACHE_TTL_MS) return;
-
-      // Stale cache: background refresh (doesn't block UI)
       const capturedFolder = folder;
+
       if (mailProto === "webmail") {
-        const session = getWebmailSession();
-        fetchWebmailPage(capturedFolder, 0, session)
-          .then(fp => {
-            if (!fp) return;
-            saveWebmailSession(fp.sessionCookie);
-            applyMerge(capturedFolder, fp.messages, true);
-          })
-          .catch(() => {});
+        const notFullyLoaded = !fullyLoadedRef.current.has(capturedFolder);
+        const notBgLoading   = !bgLoadingRef.current.has(capturedFolder);
+
+        if (age < CACHE_TTL_MS) {
+          // Fresh cache — but may be incomplete (e.g. loaded from localStorage with only page 0)
+          // If cache size is a multiple of PAGE_SIZE, there might be more pages
+          const nextPage = cached.length / 200;
+          if (notFullyLoaded && notBgLoading && cached.length > 0 && cached.length % 200 === 0) {
+            startBackgroundPages(capturedFolder, nextPage, getWebmailSession());
+          }
+          return;
+        }
+
+        // Stale cache: re-check page 0 for new messages, then load any missing pages
+        if (notBgLoading) {
+          startBackgroundPages(capturedFolder, 0, getWebmailSession());
+        }
       } else {
+        if (age < CACHE_TTL_MS) return;
+        // Outlook COM stale background refresh
         fetch(`/api/outlook/messages?${new URLSearchParams({ folder: capturedFolder, limit: "50" })}`)
           .then(r => r.json())
           .then((data: unknown) => {
