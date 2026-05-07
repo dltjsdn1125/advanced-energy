@@ -29,11 +29,17 @@ const FOLDER_LABELS: Record<Folder, string> = {
   junk: "Junk", deleted: "Deleted", important: "Important",
 };
 const REAL_FOLDERS: Folder[] = ["inbox", "sent", "drafts", "junk", "deleted"];
-const CACHE_KEY        = "ae_outlook_msg_cache_v1";
-const REPORT_CACHE_KEY = "ae_report_cache_v1";
+const CACHE_KEY         = "ae_outlook_msg_cache_v1";
+const LS_CACHE_KEY      = "ae_outlook_msg_ls_v2"; // localStorage — survives tab close
+const REPORT_CACHE_KEY  = "ae_report_cache_v1";
 const PATTERN_CACHE_KEY = "ae_pattern_cache_v1";
 const TASK_CACHE_KEY    = "ae_task_cache_v1";
-const CACHE_TTL_MS     = 60_000;
+const CACHE_TTL_MS      = 60_000;
+const PROTO_KEY         = "ae_mail_proto"; // "webmail" | "imap" | "pop3" | ""
+// MAILNARA session cookie (survives soft navigations, cleared after 18 min)
+const WM_SESSION_KEY    = "ae_wm_session";
+const WM_SESSION_TS_KEY = "ae_wm_session_ts";
+const WM_SESSION_TTL    = 18 * 60 * 1000;
 
 const REPORT_PERIOD_LABEL: Record<ReportPeriod, string> = {
   daily: "Daily Report",
@@ -342,6 +348,64 @@ async function tryWebmailFetch(folder = "inbox"): Promise<OutlookMessage[] | nul
   return callMailApi("/api/webmail/messages", { host, user, pass, folder }, "Webmail");
 }
 
+// ── MAILNARA session cookie helpers ──────────────────────────────────────────
+function getWebmailSession(): string {
+  try {
+    const ts = Number(sessionStorage.getItem(WM_SESSION_TS_KEY) ?? "0");
+    if (Date.now() - ts > WM_SESSION_TTL) return "";
+    return sessionStorage.getItem(WM_SESSION_KEY) ?? "";
+  } catch { return ""; }
+}
+function saveWebmailSession(cookie: string) {
+  if (!cookie) return;
+  try {
+    sessionStorage.setItem(WM_SESSION_KEY, cookie);
+    sessionStorage.setItem(WM_SESSION_TS_KEY, String(Date.now()));
+  } catch {}
+}
+
+interface WebmailPageResult {
+  messages: OutlookMessage[];
+  hasMore: boolean;
+  sessionCookie: string;
+}
+
+// Single-page fetch — used for client-driven incremental loading
+async function fetchWebmailPage(
+  folder: string,
+  page: number,
+  sessionCookie: string,
+): Promise<WebmailPageResult | null> {
+  try {
+    const raw = localStorage.getItem("ae_settings_v1");
+    if (!raw) return null;
+    const cfg  = JSON.parse(raw) as Record<string, unknown>;
+    const host = String(cfg.popHost ?? "");
+    const user = String(cfg.popUser ?? "");
+    const pass = String(cfg.popPass ?? "");
+    if (!host || !user || !pass) return null;
+    const res = await fetch("/api/webmail/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ host, user, pass, folder, page, sessionCookie }),
+    });
+    const data = await res.json() as {
+      messages?: OutlookMessage[];
+      hasMore?: boolean;
+      sessionCookie?: string;
+      error?: string;
+    };
+    if (data?.error) throw new Error(String(data.error).replace(/^Error:\s*/i, ""));
+    return {
+      messages: data.messages ?? [],
+      hasMore:  data.hasMore  ?? false,
+      sessionCookie: data.sessionCookie ?? "",
+    };
+  } catch (e) {
+    throw e; // propagate to caller for connError collection
+  }
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function OutlookPage() {
   const [openaiKey,    setOpenaiKey]    = useState("");
@@ -365,9 +429,11 @@ export default function OutlookPage() {
   const [iframeW,       setIframeW]       = useState<Record<number, number>>({});
 
   // In-memory caches — persist across re-renders, reset on hard reload
-  const msgCache    = useRef<Map<Folder, OutlookMessage[]>>(new Map());
-  const msgCacheTs  = useRef<Map<Folder, number>>(new Map());
-  const threadCache = useRef<Map<string, ThreadMessage[]>>(new Map());
+  const msgCache       = useRef<Map<Folder, OutlookMessage[]>>(new Map());
+  const msgCacheTs     = useRef<Map<Folder, number>>(new Map());
+  const threadCache    = useRef<Map<string, ThreadMessage[]>>(new Map());
+  // Ref so background async tasks can check the current folder without stale closure
+  const activeFolderRef = useRef<Folder>("inbox");
 
   const persistMsgCache = useCallback(() => {
     try {
@@ -377,7 +443,9 @@ export default function OutlookPage() {
         if (!data) continue;
         payload[f] = { ts: msgCacheTs.current.get(f) ?? Date.now(), data };
       }
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+      const serialized = JSON.stringify(payload);
+      sessionStorage.setItem(CACHE_KEY, serialized);
+      localStorage.setItem(LS_CACHE_KEY, serialized); // persist across tab close / next visit
     } catch {}
   }, []);
 
@@ -495,13 +563,16 @@ export default function OutlookPage() {
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(CACHE_KEY);
+      // sessionStorage survives same tab; localStorage survives tab close / next visit
+      const raw = sessionStorage.getItem(CACHE_KEY) ?? localStorage.getItem(LS_CACHE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Record<string, { ts?: number; data?: OutlookMessage[] }>;
       for (const f of REAL_FOLDERS) {
         const row = parsed?.[f];
         if (!row || !Array.isArray(row.data)) continue;
         msgCache.current.set(f, row.data);
+        // When loaded from localStorage (different session) treat as stale so a background
+        // refresh is triggered, but the user sees data immediately
         msgCacheTs.current.set(f, row.ts ?? 0);
       }
       const inbox = msgCache.current.get("inbox");
@@ -511,6 +582,9 @@ export default function OutlookPage() {
       }
     } catch {}
   }, []);
+
+  // Keep activeFolderRef in sync for background async tasks
+  useEffect(() => { activeFolderRef.current = activeFolder; }, [activeFolder]);
   function handleSaveSettings(v: { openaiKey: string }) {
     localStorage.setItem("ae_openai_key", v.openaiKey);
     setOpenaiKey(v.openaiKey); setSettingsOpen(false);
@@ -520,8 +594,9 @@ export default function OutlookPage() {
     setMsgError(null);
     const selectedEntryId = selected?.entryId ?? "";
     const preserveSelection = folder === activeFolder && !!selectedEntryId;
+
+    // Virtual folders — no API call
     if (folder === "important" || folder === "toMe") {
-      // Virtual folder — no API call, just use local state
       if (folder === "toMe") {
         const inboxCached = msgCache.current.get("inbox") ?? [];
         setMessages(inboxCached.filter(m => !!m.isToMe));
@@ -529,41 +604,80 @@ export default function OutlookPage() {
       setSelected(null); setThread([]);
       return;
     }
-    const cached = msgCache.current.get(folder);
 
-    // ── Incremental refresh (새로고침 버튼) ─────────────────────────────────────
-    // Fetch the 50 most recent emails, find ones not already in cache, prepend them.
-    // This is reliable: no PS-side date parsing, no timezone issues.
-    if (forceRefresh && cached && cached.length > 0) {
-      try {
-        const qs  = new URLSearchParams({ folder, limit: "200", force: "1" });
-        const res = await fetch(`/api/outlook/messages?${qs}`, { cache: "no-store" });
-        const data = await res.json();
-        if (data?.error) throw new Error(data.error);
-        if (Array.isArray(data) && data.length > 0) {
-          const recentMsgs = data as OutlookMessage[];
-          const existingIds = new Set(cached.map((m: OutlookMessage) => m.entryId.toUpperCase()));
-          const trulyNew = recentMsgs.filter((m: OutlookMessage) => !existingIds.has(m.entryId.toUpperCase()));
-          if (trulyNew.length > 0) {
-            const merged = [...trulyNew, ...cached];
-            setFolderCache(folder, merged);
-            setMessages(merged);
-            setLoadingCount(merged.length);
-            // 현재 선택 유지 — Outlook처럼 새 메일은 목록 상단에만 추가
-          } else {
-            // No new emails — update read/unread state for existing messages
-            const updatedMap = new Map(recentMsgs.map(m => [m.entryId.toUpperCase(), m]));
-            const refreshed = cached.map((m: OutlookMessage) => updatedMap.get(m.entryId.toUpperCase()) ?? m);
-            setFolderCache(folder, refreshed);
-            setMessages(refreshed);
-          }
-        }
+    const cached = msgCache.current.get(folder);
+    const mailProto = localStorage.getItem(PROTO_KEY) ?? "";
+
+    // ── Helper: merge new messages into cache & update UI ─────────────────────
+    const applyMerge = (capturedFolder: Folder, newMsgs: OutlookMessage[], prepend: boolean) => {
+      const existing = msgCache.current.get(capturedFolder) ?? [];
+      const existingIds = new Set(existing.map(m => m.entryId.toUpperCase()));
+      const trulyNew = newMsgs.filter(m => !existingIds.has(m.entryId.toUpperCase()));
+      if (trulyNew.length === 0) {
+        // Refresh read/unread state for already-known messages
+        const updMap = new Map(newMsgs.map(m => [m.entryId.toUpperCase(), m]));
+        const refreshed = existing.map(m => updMap.get(m.entryId.toUpperCase()) ?? m);
+        setFolderCache(capturedFolder, refreshed);
+        if (activeFolderRef.current === capturedFolder) setMessages(refreshed);
         return;
-      } catch (err) {
-        console.error('[REFRESH] fallback to full refresh:', err);
       }
+      const merged = prepend ? [...trulyNew, ...existing] : [...existing, ...trulyNew];
+      setFolderCache(capturedFolder, merged);
+      if (activeFolderRef.current === capturedFolder) {
+        setMessages([...merged]);
+        setLoadingCount(merged.length);
+      }
+    };
+
+    // ── Background webmail page loader (runs after page 0 is shown) ──────────
+    const startBackgroundPages = (capturedFolder: Folder, startPage: number, initCookie: string) => {
+      (async () => {
+        let page   = startPage;
+        let cookie = initCookie;
+        while (true) {
+          try {
+            const result = await fetchWebmailPage(capturedFolder, page, cookie);
+            if (!result) break;
+            cookie = result.sessionCookie || cookie;
+            saveWebmailSession(cookie);
+            applyMerge(capturedFolder, result.messages, false);
+            if (!result.hasMore) break;
+            page++;
+          } catch { break; }
+        }
+      })();
+    };
+
+    // ── Incremental refresh (새로고침 버튼) ────────────────────────────────────
+    if (forceRefresh && cached && cached.length > 0) {
+      if (mailProto === "webmail") {
+        // Webmail: fetch page 0 only, merge new into top
+        try {
+          const session   = getWebmailSession();
+          const firstPage = await fetchWebmailPage(folder, 0, session);
+          if (firstPage) {
+            saveWebmailSession(firstPage.sessionCookie);
+            applyMerge(folder, firstPage.messages, true);
+            return;
+          }
+        } catch (err) { console.error("[REFRESH] webmail incremental failed:", err); }
+      } else {
+        // Outlook COM incremental
+        try {
+          const qs  = new URLSearchParams({ folder, limit: "200", force: "1" });
+          const res = await fetch(`/api/outlook/messages?${qs}`, { cache: "no-store" });
+          const data = await res.json();
+          if (data?.error) throw new Error(data.error);
+          if (Array.isArray(data) && data.length > 0) {
+            applyMerge(folder, data as OutlookMessage[], true);
+          }
+          return;
+        } catch (err) { console.error("[REFRESH] COM incremental failed:", err); }
+      }
+      // Fall through to full reload if incremental failed
     }
 
+    // ── Serve from cache ──────────────────────────────────────────────────────
     if (cached && !forceRefresh) {
       setMessages(cached); setLoadingCount(cached.length);
       if (preserveSelection) {
@@ -573,82 +687,89 @@ export default function OutlookPage() {
       } else if (cached.length > 0) {
         selectMessage(cached[0]);
       }
-      // Prefetch threads for next visible messages in background
       cached.slice(1, 6).forEach(m => prefetchThread(m));
+
       const age = Date.now() - (msgCacheTs.current.get(folder) ?? 0);
       if (age < CACHE_TTL_MS) return;
-      // Stale cache: background refresh of 50 most recent, merge new ones
-      fetch(`/api/outlook/messages?${new URLSearchParams({ folder, limit: "50" })}`)
-        .then(r => r.json())
-        .then((data: unknown) => {
-          if (!Array.isArray(data) || data.length === 0) return;
-          const recentMsgs = data as OutlookMessage[];
-          const existing = msgCache.current.get(folder) ?? [];
-          const existingIds = new Set(existing.map(m => m.entryId.toUpperCase()));
-          const trulyNew = recentMsgs.filter(m => !existingIds.has(m.entryId.toUpperCase()));
-          if (trulyNew.length === 0) return;
-          const merged = [...trulyNew, ...existing];
-          setFolderCache(folder, merged);
-          if (activeFolder === folder) {
-            setMessages(merged);
-            setLoadingCount(merged.length);
-            if (preserveSelection) {
-              const matched = merged.find(m => m.entryId === selectedEntryId);
-              if (matched) setSelected(matched);
-            }
-          }
-        })
-        .catch(() => {});
+
+      // Stale cache: background refresh (doesn't block UI)
+      const capturedFolder = folder;
+      if (mailProto === "webmail") {
+        const session = getWebmailSession();
+        fetchWebmailPage(capturedFolder, 0, session)
+          .then(fp => {
+            if (!fp) return;
+            saveWebmailSession(fp.sessionCookie);
+            applyMerge(capturedFolder, fp.messages, true);
+          })
+          .catch(() => {});
+      } else {
+        fetch(`/api/outlook/messages?${new URLSearchParams({ folder: capturedFolder, limit: "50" })}`)
+          .then(r => r.json())
+          .then((data: unknown) => {
+            if (!Array.isArray(data) || data.length === 0) return;
+            applyMerge(capturedFolder, data as OutlookMessage[], true);
+          })
+          .catch(() => {});
+      }
       return;
     } else {
-      // forceRefresh=true 인데 캐시가 없는 경우 또는 캐시가 비어있는 경우만 클리어
-      // (증분 fetch 실패 fallthrough 시 기존 목록 유지)
       if (!cached || cached.length === 0) {
         setMessages([]); setLoadingCount(0);
-        if (!preserveSelection) {
-          setSelected(null); setThread([]);
-        }
+        if (!preserveSelection) { setSelected(null); setThread([]); }
       }
     }
+
+    // ── Full load ─────────────────────────────────────────────────────────────
     setMsgLoading(true);
     try {
       const qs  = new URLSearchParams({ folder });
       const res = await fetch(`/api/outlook/messages?${qs}`);
       let data  = await res.json();
 
-      // ── Mail fallback: IMAP → POP3 → Webmail (non-Windows / Outlook not running) ─
       if (res.status === 503 || data?.error) {
         let mailMsgs: OutlookMessage[] | null = null;
         let connError = "";
 
         if (folder === "inbox" || folder === "sent") {
-          // 1) IMAP (inbox/sent only)
+          // 1) IMAP
           const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
           if ("ok" in imapResult && imapResult.ok !== null) {
             mailMsgs = imapResult.ok;
+            localStorage.setItem(PROTO_KEY, "imap");
           } else if ("err" in imapResult) {
             connError = imapResult.err;
           }
 
-          // 2) POP3 (IMAP이 없거나 실패했을 때)
+          // 2) POP3
           if (mailMsgs === null) {
             const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
             if ("ok" in pop3Result && pop3Result.ok !== null) {
               mailMsgs = pop3Result.ok;
+              localStorage.setItem(PROTO_KEY, "pop3");
             } else if ("err" in pop3Result) {
               connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
             }
           }
         }
 
-        // 3) Webmail scraper — all folders (POP3/IMAP IP 차단 또는 drafts/deleted/junk)
+        // 3) Webmail — client-driven pagination (page 0 shown immediately, rest in background)
         if (mailMsgs === null) {
-          const webResult = await tryWebmailFetch(folder).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-          if ("ok" in webResult && webResult.ok !== null) {
-            mailMsgs = webResult.ok;
-            connError = "";
-          } else if ("err" in webResult) {
-            connError = connError ? `${connError}\n${webResult.err}` : webResult.err;
+          try {
+            const session   = getWebmailSession();
+            const firstPage = await fetchWebmailPage(folder, 0, session);
+            if (firstPage !== null) {
+              saveWebmailSession(firstPage.sessionCookie);
+              mailMsgs = firstPage.messages;
+              connError = "";
+              localStorage.setItem(PROTO_KEY, "webmail");
+              // Pages 1+ load in background and append to the list
+              if (firstPage.hasMore) {
+                startBackgroundPages(folder, 1, firstPage.sessionCookie);
+              }
+            }
+          } catch (e) {
+            connError = connError ? `${connError}\n${String(e)}` : String(e);
           }
         }
 
@@ -662,6 +783,8 @@ export default function OutlookPage() {
             "설정 → IMAP 또는 POP3 항목에 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다."
           );
         }
+      } else {
+        localStorage.setItem(PROTO_KEY, "outlook");
       }
 
       const msgs: OutlookMessage[] = Array.isArray(data) ? data : [];
@@ -2184,6 +2307,8 @@ export default function OutlookPage() {
               className="flex-1 bg-transparent py-2.5 text-[12px] text-ink-800 focus:outline-none placeholder:text-ink-300"
             />
           </div>
+          {/* Scrollable body area (textarea + quoted email) */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {/* Body */}
           <textarea
             value={composeBody}
@@ -2218,6 +2343,7 @@ export default function OutlookPage() {
               </div>
             );
           })()}
+          </div>{/* end scrollable body */}
           {/* Footer */}
           <div className="flex shrink-0 flex-col gap-2 border-t border-ink-100 px-4 py-3">
             {replyStatus && (

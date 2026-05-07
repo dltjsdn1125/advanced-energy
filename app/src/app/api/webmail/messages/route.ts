@@ -61,9 +61,7 @@ async function mailnaraLogin(
     throw new Error(`웹메일 로그인 실패: ${err}`);
   }
 
-  // Collect all Set-Cookie values
   const allCookies: string[] = [];
-  // Node 18+ supports getSetCookie()
   if (typeof (resp.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === "function") {
     const fn = (resp.headers as unknown as { getSetCookie: () => string[] }).getSetCookie;
     allCookies.push(...fn.call(resp.headers));
@@ -72,7 +70,6 @@ async function mailnaraLogin(
     if (raw) allCookies.push(raw);
   }
 
-  // Parse into name=value pairs
   const cookiePairs = allCookies.map(c => c.split(";")[0].trim()).filter(Boolean);
   if (!cookiePairs.length) throw new Error("웹메일 로그인 실패: 세션 쿠키 없음");
   return cookiePairs.join("; ");
@@ -81,36 +78,29 @@ async function mailnaraLogin(
 function parseMailList(html: string, mailbox = "Inbox"): unknown[] {
   const messages: unknown[] = [];
 
-  // Split on each row_id boundary — more robust than lookahead regex
   const parts = html.split(/(?=id=["']row_id_\d+["'])/);
 
   for (const part of parts) {
     const uidMatch = part.match(/id=["']row_id_(\d+)["']/);
     if (!uidMatch) continue;
     const uid = uidMatch[1];
-    // Limit block to at most 6000 chars to avoid cross-item bleed
     const block = part.slice(0, 6000);
 
-    // seen status (double or single quotes)
     const seenMatch = block.match(new RegExp(`id=["']seen_${uid}["'][^>]*value=["']([^"']+)["']`));
     const isUnread = !seenMatch || seenMatch[1] === "N";
 
-    // from email
     const fromEmailMatch = block.match(new RegExp(`id=["']from_address_${uid}["'][^>]*value=["']([^"']+)["']`));
     const fromEmail = fromEmailMatch ? fromEmailMatch[1] : "";
 
-    // from name — span with title attr in m-from area
     const fromNameMatch = block.match(/<span[^>]+title=["'][^"']*["'][^>]*>([^<]+)<\/span>/);
     const fromNameRaw = fromNameMatch ? fromNameMatch[1] : "";
     const fromName = decodeHtml(fromNameRaw.replace(/\s*\.\.\.$/, "").trim());
 
-    // subject (try double quote, then single quote id variant)
     const subjMatch =
       block.match(new RegExp(`id=["']title_list_${uid}["'][^>]*>([^<]+)<`)) ||
-      block.match(/class=["']m-subject[^"']*["'][^>]*>\s*<[^>]+>([^<]+)</) ;
+      block.match(/class=["']m-subject[^"']*["'][^>]*>\s*<[^>]+>([^<]+)</);
     const subject = subjMatch ? decodeHtml(subjMatch[1]) : "(제목 없음)";
 
-    // date — handles "2026.05.07 <span>21:38</span>" and similar patterns
     const dateMatch = block.match(/class=["']m-date[^"']*["'][^>]*>([\d.]+)\s*<span[^>]*>([\d:]+)<\/span>/);
     let receivedTime = "";
     if (dateMatch) {
@@ -119,7 +109,6 @@ function parseMailList(html: string, mailbox = "Inbox"): unknown[] {
       receivedTime = new Date(normalized).toISOString();
     }
 
-    // attachment icon
     const hasAttach = /class=["']m-file["']/.test(block) && !/style=["'][^"']*display\s*:\s*none/.test(block);
 
     const entryId = mailbox === "Inbox" ? `web-${uid}` : `web-${mailbox}:${uid}`;
@@ -140,8 +129,9 @@ function parseMailList(html: string, mailbox = "Inbox"): unknown[] {
   return messages;
 }
 
-const PAGE_SIZE = 200; // messages per MAILNARA page request
-const FETCH_TIMEOUT_MS = 25_000; // stop paging 5s before Vercel's 30s limit
+const PAGE_SIZE = 200;
+// Kept for legacy full-pagination mode only
+const FETCH_TIMEOUT_MS = 25_000;
 
 const MAILBOX_MAP: Record<string, string> = {
   inbox:   "Inbox",
@@ -152,11 +142,14 @@ const MAILBOX_MAP: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
-  const body = await request.json() as Record<string, unknown>;
-  const host   = String(body.host   ?? "");
-  const user   = String(body.user   ?? "");
-  const pass   = String(body.pass   ?? "");
-  const folder = String(body.folder ?? "inbox").toLowerCase();
+  const body          = await request.json() as Record<string, unknown>;
+  const host          = String(body.host          ?? "");
+  const user          = String(body.user          ?? "");
+  const pass          = String(body.pass          ?? "");
+  const folder        = String(body.folder        ?? "inbox").toLowerCase();
+  // Client-driven pagination: sessionCookie avoids re-login; page fetches one page
+  const sessionCookie = String(body.sessionCookie ?? "");
+  const pageParam     = body.page !== undefined ? Number(body.page) : undefined;
 
   const mailbox = MAILBOX_MAP[folder] ?? "Inbox";
 
@@ -164,19 +157,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "webmail 설정이 필요합니다 (host, user, pass)" }, { status: 400 });
   }
 
-  console.log(`[WEBMAIL] connecting → https://${host} user=${user} mailbox=${mailbox}`);
+  console.log(`[WEBMAIL] host=${host} user=${user} mailbox=${mailbox} page=${pageParam ?? "full"}`);
 
   try {
-    const cookie = await mailnaraLogin(host, user, pass);
-    console.log(`[WEBMAIL] login ok, cookie=${cookie.slice(0, 40)}…`);
+    // Reuse existing session cookie when provided (avoids re-login for pages 1+)
+    const cookie = sessionCookie || await mailnaraLogin(host, user, pass);
+    console.log(`[WEBMAIL] cookie ok (${sessionCookie ? "reused" : "fresh"}) ${cookie.slice(0, 30)}…`);
 
+    // ── Single-page mode (client-driven pagination) ──────────────────────────
+    if (pageParam !== undefined) {
+      const listUrl = `https://${host}/new_mailnara_web/index.php/mail/mail_list/${mailbox}/${pageParam}/${PAGE_SIZE}`;
+      const listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
+      if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
+      const html = await listResp.text();
+      const msgs = parseMailList(html, mailbox);
+      console.log(`[WEBMAIL] single-page mode page=${pageParam} got=${msgs.length}`);
+      return NextResponse.json({
+        messages: msgs,
+        hasMore: msgs.length >= PAGE_SIZE,
+        sessionCookie: cookie,
+      });
+    }
+
+    // ── Full-pagination mode (legacy / first load fallback) ──────────────────
     const allMessages: unknown[] = [];
     const started = Date.now();
     let page = 0;
 
     while (true) {
       if (Date.now() - started > FETCH_TIMEOUT_MS) {
-        console.log(`[WEBMAIL] timeout guard hit — stopping at page=${page} total=${allMessages.length}`);
+        console.log(`[WEBMAIL] timeout guard — page=${page} total=${allMessages.length}`);
         break;
       }
 
@@ -184,25 +194,23 @@ export async function POST(request: NextRequest) {
       const listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
       if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
 
-
       const html = await listResp.text();
-      // Log HTML structure on first page to discover mail view URL pattern
       if (page === 0) {
         const rowIdx = html.indexOf("row_id_");
         const snippet = rowIdx >= 0 ? html.slice(Math.max(0, rowIdx - 50), rowIdx + 500) : html.slice(0, 500);
-        console.log(`[WEBMAIL] page0 html snippet: ${snippet.replace(/\n/g, " ").replace(/\s+/g, " ")}`);
+        console.log(`[WEBMAIL] page0 snippet: ${snippet.replace(/\n/g, " ").replace(/\s+/g, " ")}`);
       }
       const msgs = parseMailList(html, mailbox);
       console.log(`[WEBMAIL] page=${page} got=${msgs.length}`);
 
       if (msgs.length === 0) break;
       allMessages.push(...msgs);
-      if (msgs.length < PAGE_SIZE) break; // partial page = last page
+      if (msgs.length < PAGE_SIZE) break;
 
       page++;
     }
 
-    console.log(`[WEBMAIL] done. total=${allMessages.length} messages (${page + 1} pages)`);
+    console.log(`[WEBMAIL] done. total=${allMessages.length} (${page + 1} pages)`);
     return NextResponse.json(allMessages);
   } catch (e: unknown) {
     const msg = String(e).replace(/^Error:\s*/gi, "");
