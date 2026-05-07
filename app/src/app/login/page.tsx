@@ -1,12 +1,11 @@
 "use client";
 import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 
 function LoginForm() {
   const { signIn } = useAuth();
-  const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") ?? "/";
 
@@ -24,7 +23,7 @@ function LoginForm() {
     if (err) {
       setError(err);
     } else {
-      router.push(next);
+      window.location.replace(next);
     }
   }
 

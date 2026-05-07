@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -16,7 +16,6 @@ const NAV = [
 
 export default function GlobalNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const { user, signOut, loading, isAdmin } = useAuth();
 
@@ -27,7 +26,7 @@ export default function GlobalNav() {
   async function handleSignOut() {
     setOpen(false);
     await signOut();
-    router.push("/login");
+    window.location.replace("/login");
   }
 
   return (
