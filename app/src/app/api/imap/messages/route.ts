@@ -4,6 +4,7 @@ import { ImapFlow } from "imapflow";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 30;
+export const preferredRegion = ["icn1", "nrt1", "sin1"]; // Seoul → Tokyo → Singapore (Korean mail servers)
 
 export async function POST(request: NextRequest) {
   const body = await request.json() as Record<string, unknown>;
