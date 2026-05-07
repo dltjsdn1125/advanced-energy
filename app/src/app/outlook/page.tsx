@@ -813,8 +813,9 @@ export default function OutlookPage() {
         if (data?.error) throw new Error(data.error);
         fetchedMsgs = Array.isArray(data) ? data : [];
       }
-      threadCache.current.set(msg.entryId, fetchedMsgs);
-      setThread(fetchedMsgs as ThreadMessage[]);
+      const typedMsgs = fetchedMsgs as ThreadMessage[];
+      threadCache.current.set(msg.entryId, typedMsgs);
+      setThread(typedMsgs);
       // Prefetch next two messages in background
       const list = msgCache.current.get(activeFolder) ?? [];
       const idx  = list.findIndex(m => m.entryId === msg.entryId);
