@@ -780,38 +780,50 @@ export default function OutlookPage() {
       let data: any;
       let connError = "";
 
-      // ── Step 1: IMAP first (reliable pagination, fetches all messages) ────
-      // IMAP supports proper pagination via UID range — webmail returns only ~14
-      // per page on this MAILNARA instance regardless of requested size, so IMAP
-      // is the only protocol that can reliably load all ~600 emails.
-      if (folder === "inbox" || folder === "sent") {
-        const imapResult = await tryImapFetch(2000).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-        if ("ok" in imapResult && imapResult.ok !== null && imapResult.ok.length > 0) {
-          data = imapResult.ok;
-          localStorage.setItem(PROTO_KEY, "imap");
-        } else if ("err" in imapResult) {
-          connError = (imapResult as { err: string }).err;
+      // ── Step 1: Webmail first — guaranteed to return SOMETHING quickly ────
+      // We later try IMAP in parallel for a fuller list.
+      try {
+        const session   = getWebmailSession();
+        const firstPage = await fetchWebmailPage(folder, 0, session);
+        if (firstPage !== null) {
+          saveWebmailSession(firstPage.sessionCookie);
+          data = firstPage.messages;
+          localStorage.setItem(PROTO_KEY, "webmail");
+          if (firstPage.hasMore) {
+            startBackgroundPages(folder, 1, firstPage.sessionCookie);
+          } else {
+            fullyLoadedRef.current.add(folder);
+          }
         }
+      } catch (e) {
+        connError = String(e);
       }
 
-      // ── Step 2: Webmail fallback (single page when IMAP unavailable) ──────
-      if (data === undefined) {
-        try {
-          const session   = getWebmailSession();
-          const firstPage = await fetchWebmailPage(folder, 0, session);
-          if (firstPage !== null) {
-            saveWebmailSession(firstPage.sessionCookie);
-            data = firstPage.messages;
-            localStorage.setItem(PROTO_KEY, "webmail");
-            if (firstPage.hasMore) {
-              startBackgroundPages(folder, 1, firstPage.sessionCookie);
-            } else {
-              fullyLoadedRef.current.add(folder);
+      // ── Step 1b: IMAP background enhance — fetch all msgs and replace if we get more ──
+      // Runs only for inbox/sent. Doesn't block the initial display.
+      if ((folder === "inbox" || folder === "sent") && !bgLoadingRef.current.has(folder)) {
+        bgLoadingRef.current.add(folder);
+        (async () => {
+          try {
+            const imapMsgs = await tryImapFetch(2000);
+            if (Array.isArray(imapMsgs) && imapMsgs.length > 0) {
+              const cur = msgCache.current.get(folder) ?? [];
+              if (imapMsgs.length > cur.length) {
+                setFolderCache(folder, imapMsgs);
+                if (activeFolderRef.current === folder) {
+                  setMessages(imapMsgs);
+                  setLoadingCount(imapMsgs.length);
+                }
+                localStorage.setItem(PROTO_KEY, "imap");
+                fullyLoadedRef.current.add(folder);
+              }
             }
+          } catch (e) {
+            console.warn("[IMAP background] failed:", e);
+          } finally {
+            bgLoadingRef.current.delete(folder);
           }
-        } catch (e) {
-          connError = connError ? `${connError}\n${String(e)}` : String(e);
-        }
+        })();
       }
 
       // ── Step 3: Outlook COM (Windows desktop only) ───────────────────────
