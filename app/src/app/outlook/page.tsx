@@ -695,13 +695,17 @@ export default function OutlookPage() {
     // ── Incremental refresh (새로고침 버튼) ────────────────────────────────────
     if (forceRefresh && cached && cached.length > 0) {
       if (mailProto === "webmail") {
-        // Webmail: fetch page 0 only, merge new into top
+        // Webmail: fetch page 0 only, merge new into top, then continue paginating
+        // in background so the rest of the inbox catches up with the user's clicks.
         try {
           const session   = getWebmailSession();
           const firstPage = await fetchWebmailPage(folder, 0, session);
           if (firstPage) {
             saveWebmailSession(firstPage.sessionCookie);
             applyMerge(folder, firstPage.messages, true);
+            if (firstPage.hasMore && !fullyLoadedRef.current.has(folder)) {
+              startBackgroundPages(folder, 1, firstPage.sessionCookie);
+            }
             return;
           }
         } catch (err) { console.error("[REFRESH] webmail incremental failed:", err); }
@@ -759,6 +763,18 @@ export default function OutlookPage() {
           } catch (e) { console.warn("[IMAP cache-serve enhance] failed:", e); }
           finally { imapEnhanceRef.current.delete(capturedFolder); }
         })();
+      }
+
+      // Webmail background pagination — keep loading older pages from where the
+      // cache left off. Without this the inbox is frozen at whatever was cached
+      // last visit (commonly just 15 from MAILNARA's first page).
+      if (mailProto === "webmail"
+          && !fullyLoadedRef.current.has(capturedFolder)
+          && !bgLoadingRef.current.has(capturedFolder)
+          && cached.length > 0) {
+        // Resume from page 1 — page 0 was just shown from cache. We accept that
+        // pages 1+ may overlap; applyMerge dedupes.
+        startBackgroundPages(capturedFolder, 1, getWebmailSession());
       }
       return;
     } else {
