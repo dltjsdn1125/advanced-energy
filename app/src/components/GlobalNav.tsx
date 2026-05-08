@@ -33,7 +33,7 @@ export default function GlobalNav() {
     <nav className="relative shrink-0 bg-white border-b border-black/10 z-40 shadow-sm">
       <div className="flex h-10 items-center gap-0.5 px-3">
         <Link href="/" className="mr-3 shrink-0 flex items-center hover:opacity-80 transition-opacity">
-          <Image src="/logo.png" alt="AE" width={80} height={28} className="h-7 w-auto object-contain" priority/>
+          <Image src="/Semigate.png" alt="Semigate" width={80} height={28} className="h-7 w-auto object-contain" priority/>
         </Link>
 
         {/* Desktop links */}
