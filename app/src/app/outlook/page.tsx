@@ -669,50 +669,46 @@ export default function OutlookPage() {
     };
 
     // ── Background webmail page loader (runs after page 0 is shown) ──────────
-    // Fires pages in parallel batches of CONCURRENCY for speed. With concurrent
-    // access blocking off, MAILNARA handles 5+ simultaneous requests fine.
-    // 40 sequential pages × 1.5s = 60s → 8 batches × 1.5s = ~12s.
+    // Sequential fetch — MAILNARA's pagination uses session-side cursor state,
+    // and concurrent requests on the same session race the cursor, causing
+    // duplicates and early termination. Sequential is slower but reliable.
+    // To partially recover speed, we tolerate up to MAX_CONSECUTIVE_EMPTY empty
+    // pages before giving up (some MAILNARA installs have transient empty
+    // responses mid-pagination when the cursor lands between batches).
     const startBackgroundPages = (capturedFolder: Folder, startPage: number, initCookie: string) => {
-      if (bgLoadingRef.current.has(capturedFolder)) return; // already running
+      if (bgLoadingRef.current.has(capturedFolder)) return;
       bgLoadingRef.current.add(capturedFolder);
-      const CONCURRENCY = 5;
+      const MAX_CONSECUTIVE_EMPTY = 2;
+      const HARD_PAGE_CAP = 200;
       (async () => {
         let page = startPage;
         let cookie = initCookie;
-        let stop = false;
-        while (!stop) {
-          // Build a batch of CONCURRENCY page fetches
-          const batch: number[] = [];
-          for (let i = 0; i < CONCURRENCY; i++) batch.push(page + i);
-          const results = await Promise.allSettled(
-            batch.map(p => fetchWebmailPage(capturedFolder, p, cookie)),
-          );
-          // Process results in page order so applyMerge ordering stays sane
-          let highestNonEmpty = -1;
-          for (let i = 0; i < results.length; i++) {
-            const r = results[i];
-            if (r.status !== "fulfilled" || !r.value) continue;
-            const v = r.value;
-            cookie = v.sessionCookie || cookie;
-            if (v.messages.length > 0) highestNonEmpty = i;
-            applyMerge(capturedFolder, v.messages, batch[i] === 0);
-            // If a page returns 0 messages OR hasMore=false, that's the end
-            if (!v.hasMore || v.messages.length === 0) {
-              // But only stop if all preceding pages in this batch were also empty;
-              // otherwise the empty might be a transient miss in the middle.
-              if (i <= highestNonEmpty) continue;
-              stop = true;
+        let consecutiveEmpty = 0;
+        while (page < HARD_PAGE_CAP) {
+          try {
+            const result = await fetchWebmailPage(capturedFolder, page, cookie);
+            if (!result) break;
+            cookie = result.sessionCookie || cookie;
+            saveWebmailSession(cookie);
+            applyMerge(capturedFolder, result.messages, page === 0);
+            if (result.messages.length === 0) {
+              consecutiveEmpty++;
+              if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
+                fullyLoadedRef.current.add(capturedFolder);
+                break;
+              }
+            } else {
+              consecutiveEmpty = 0;
+            }
+            if (!result.hasMore && consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
+              fullyLoadedRef.current.add(capturedFolder);
               break;
             }
-          }
-          if (cookie) saveWebmailSession(cookie);
-          if (stop) {
-            fullyLoadedRef.current.add(capturedFolder);
+            page++;
+          } catch (e) {
+            console.warn(`[bg pages] page=${page} failed:`, e);
             break;
           }
-          page += CONCURRENCY;
-          // Hard cap to prevent infinite loops if MAILNARA misbehaves
-          if (page > 200) break;
         }
         bgLoadingRef.current.delete(capturedFolder);
       })();
@@ -794,7 +790,9 @@ export default function OutlookPage() {
                   setLoadingCount(winner.length);
                 }
                 localStorage.setItem(PROTO_KEY, winnerProto);
-                fullyLoadedRef.current.add(capturedFolder);
+                // Don't lock fullyLoadedRef — POP3 might have hit Vercel's
+                // 60s timeout and returned partial results. Let webmail
+                // pagination keep going to fill in the rest.
               }
             }
           } catch (e) { console.warn("[bg enhance] failed:", e); }
@@ -802,15 +800,26 @@ export default function OutlookPage() {
         })();
       }
 
-      // Webmail background pagination — keep loading older pages from where the
-      // cache left off. Without this the inbox is frozen at whatever was cached
-      // last visit (commonly just 15 from MAILNARA's first page).
-      if (mailProto === "webmail"
+      // Webmail background pagination — keep loading older pages even if
+      // POP3/IMAP returned a partial set. Fires whenever webmail credentials
+      // exist and we haven't already declared the folder fully loaded.
+      const hasWebmailCreds = (() => {
+        try {
+          const raw = localStorage.getItem("ae_settings_v1");
+          if (!raw) return false;
+          const cfg = JSON.parse(raw) as Record<string, unknown>;
+          const h = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
+          const u = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
+          const p = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
+          return !!(h && u && p);
+        } catch { return false; }
+      })();
+      if (hasWebmailCreds
           && !fullyLoadedRef.current.has(capturedFolder)
           && !bgLoadingRef.current.has(capturedFolder)
           && cached.length > 0) {
-        // Resume from page 1 — page 0 was just shown from cache. We accept that
-        // pages 1+ may overlap; applyMerge dedupes.
+        // Resume from page 1 — page 0 was just shown from cache. applyMerge
+        // dedupes by entryId so overlap with cache is harmless.
         startBackgroundPages(capturedFolder, 1, getWebmailSession());
       }
       return;
@@ -883,7 +892,10 @@ export default function OutlookPage() {
                   setLoadingCount(winner.length);
                 }
                 localStorage.setItem(PROTO_KEY, winnerProto);
-                fullyLoadedRef.current.add(folder);
+                // Note: do NOT mark fullyLoadedRef. POP3 may have hit a 60s
+                // Vercel timeout and returned partial results. Letting the
+                // webmail page loop continue gives us a second chance to
+                // surface any messages POP3 missed.
               }
             }
           } catch (e) {
