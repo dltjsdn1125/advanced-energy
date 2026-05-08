@@ -944,12 +944,17 @@ export default function OutlookPage() {
       } catch {}
     }
 
-    // Run settings sync in background — never block mail load.
-    // If creds arrive after the first load attempt, the next refresh will pick them up.
-    ensureSettings().catch(() => {});
-
-    migrateProtoIfNeeded();
-    loadMessages("inbox").then(() => {
+    // Sync settings from cloud BEFORE first load (with a 4s timeout so we
+    // never block longer than that). Then re-load if creds arrived.
+    const syncWithTimeout = Promise.race([
+      ensureSettings(),
+      new Promise<void>(resolve => setTimeout(resolve, 4000)),
+    ]);
+    syncWithTimeout.then(() => {
+      // After settings have settled, kick off the load. If creds were absent
+      // before but present now, this is the load that actually finds them.
+      migrateProtoIfNeeded();
+      loadMessages("inbox").then(() => {
       // Prefetch other folders after inbox loads. IMAP route only supports INBOX,
       // so for sent/drafts/deleted/junk we always fall back to webmail.
       setTimeout(async () => {
@@ -977,6 +982,7 @@ export default function OutlookPage() {
           }
         }
       }, 1500);
+    });
     });
   }, []); // eslint-disable-line
 
