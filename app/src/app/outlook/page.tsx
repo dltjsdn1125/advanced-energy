@@ -1171,6 +1171,12 @@ export default function OutlookPage() {
 
     // 2) Webmail path — proxy through MAILNARA session via /api/webmail/attachment
     if (entryId.startsWith("web-") && att.downloadUrl) {
+      console.log(`[downloadAtt] webmail proxy → ${att.name} (downloadUrl=${att.downloadUrl})`);
+      // Reject obviously non-fetchable URLs early so we can give a useful error
+      if (/^javascript:/i.test(att.downloadUrl)) {
+        alert(`이 첨부는 JavaScript 함수로 다운로드되도록 되어 있어 프록시할 수 없습니다.\nhref: ${att.downloadUrl}`);
+        return;
+      }
       try {
         const raw = localStorage.getItem("ae_settings_v1");
         const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
@@ -1198,8 +1204,8 @@ export default function OutlookPage() {
         setTimeout(() => URL.revokeObjectURL(url), 30_000);
         return;
       } catch (e) {
-        console.error("[downloadAtt] webmail proxy fail:", e);
-        alert("첨부파일 다운로드 실패: " + String(e));
+        console.error("[downloadAtt] webmail proxy fail:", e, "downloadUrl was:", att.downloadUrl);
+        alert(`첨부파일 다운로드 실패: ${String(e)}\nURL: ${att.downloadUrl}`);
         return;
       }
     }

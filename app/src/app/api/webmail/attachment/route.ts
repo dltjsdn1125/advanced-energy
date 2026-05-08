@@ -54,14 +54,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "필수 파라미터: host, user, pass, downloadUrl" }, { status: 400 });
   }
 
-  // Resolve download URL — accept relative or absolute, but pin to host
+  // Resolve download URL — accept relative or absolute. We only block URLs
+  // whose hostname is on a totally unrelated domain. Same root domain
+  // (mail.semigate.com → download.semigate.com etc) is allowed because
+  // MAILNARA installations often serve attachments from a sibling subdomain.
   let absUrl = downloadUrl;
-  if (downloadUrl.startsWith("/")) {
+  if (downloadUrl.startsWith("//")) {
+    absUrl = `https:${downloadUrl}`;
+  } else if (downloadUrl.startsWith("/")) {
     absUrl = `https://${host}${downloadUrl}`;
-  } else if (!downloadUrl.startsWith("http")) {
+  } else if (!/^https?:\/\//i.test(downloadUrl)) {
     absUrl = `https://${host}/${downloadUrl}`;
-  } else if (!downloadUrl.startsWith(`https://${host}`) && !downloadUrl.startsWith(`http://${host}`)) {
-    return NextResponse.json({ error: "외부 URL 다운로드 불가" }, { status: 400 });
+  }
+
+  // Sanity check: parse and verify it shares the root domain with `host`
+  try {
+    const parsed = new URL(absUrl);
+    const rootDomain = (h: string) => {
+      const parts = h.split(".");
+      return parts.length >= 2 ? parts.slice(-2).join(".") : h;
+    };
+    if (rootDomain(parsed.hostname) !== rootDomain(host)) {
+      console.warn(`[WEBMAIL-ATTACH] cross-domain blocked. configured host=${host} download host=${parsed.hostname}`);
+      return NextResponse.json(
+        { error: `다른 도메인 다운로드 불가: ${parsed.hostname}` },
+        { status: 400 },
+      );
+    }
+  } catch (e) {
+    console.error(`[WEBMAIL-ATTACH] bad URL ${absUrl}:`, e);
+    return NextResponse.json({ error: `잘못된 URL: ${absUrl}` }, { status: 400 });
   }
 
   console.log(`[WEBMAIL-ATTACH] ${user} download ${absUrl}`);
