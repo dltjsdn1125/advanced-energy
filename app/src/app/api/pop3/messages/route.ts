@@ -100,36 +100,55 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
-  console.log(`[POP3] connecting → ${host}:${port} ssl=${ssl} user=${user}`);
+  // Try the user-supplied host first, then common POP3 hostname variants.
+  // Some users save the webmail host (mail.X) instead of the POP3 host (pop.X).
+  const hostVariants: string[] = [host];
+  const noPrefix = host.replace(/^(mail|webmail|smtp|imap|pop|pop3)\./i, "");
+  if (noPrefix !== host) {
+    hostVariants.push(`pop.${noPrefix}`);
+    hostVariants.push(`pop3.${noPrefix}`);
+    hostVariants.push(noPrefix);
+  } else {
+    hostVariants.push(`pop.${host}`);
+    hostVariants.push(`pop3.${host}`);
+    hostVariants.push(`mail.${host}`);
+  }
 
-  // Retry connection up to 3x — Vercel→Korea path is flaky.
+  console.log(`[POP3] connecting → ${host}:${port} ssl=${ssl} user=${user} (variants: ${hostVariants.join(",")})`);
+
+  // Retry each host up to 3x — Vercel→Korea path is flaky.
   const MAX_ATTEMPTS = 3;
   let session: Pop3Session | null = null;
   let connectErr: unknown = null;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      const sock = await tcpConnect(host, port, ssl);
-      session = new Pop3Session(sock);
-      const greeting = await session.readLine();
-      if (!greeting.startsWith("+OK")) throw new Error(`POP3 인사 실패: ${greeting}`);
-      const userResp = await session.cmd(`USER ${user}`);
-      if (!userResp.startsWith("+OK")) throw new Error(`USER 실패: ${userResp}`);
-      const passResp = await session.cmd(`PASS ${pass}`);
-      if (!passResp.startsWith("+OK")) throw new Error(`인증 실패: ${passResp}`);
-      console.log(`[POP3] connected on attempt ${attempt}`);
-      connectErr = null;
-      break;
-    } catch (e) {
-      connectErr = e;
-      console.warn(`[POP3] attempt ${attempt}/${MAX_ATTEMPTS} failed: ${String(e)}`);
-      try { (session as { sock?: { destroy?: () => void } } | null)?.sock?.destroy?.(); } catch {}
-      session = null;
-      if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 1500));
+  let connectedHost = "";
+  outer: for (const tryHost of hostVariants) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const sock = await tcpConnect(tryHost, port, ssl);
+        session = new Pop3Session(sock);
+        const greeting = await session.readLine();
+        if (!greeting.startsWith("+OK")) throw new Error(`POP3 인사 실패: ${greeting}`);
+        const userResp = await session.cmd(`USER ${user}`);
+        if (!userResp.startsWith("+OK")) throw new Error(`USER 실패: ${userResp}`);
+        const passResp = await session.cmd(`PASS ${pass}`);
+        if (!passResp.startsWith("+OK")) throw new Error(`인증 실패: ${passResp}`);
+        console.log(`[POP3] connected to ${tryHost} on attempt ${attempt}`);
+        connectErr = null;
+        connectedHost = tryHost;
+        break outer;
+      } catch (e) {
+        connectErr = e;
+        console.warn(`[POP3] ${tryHost} attempt ${attempt}/${MAX_ATTEMPTS} failed: ${String(e)}`);
+        try { (session as { sock?: { destroy?: () => void } } | null)?.sock?.destroy?.(); } catch {}
+        session = null;
+        if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 1500));
+      }
     }
   }
   if (connectErr || !session) {
-    return NextResponse.json({ error: `POP3 연결 실패 (${MAX_ATTEMPTS}회 시도): ${String(connectErr)}` }, { status: 500 });
+    return NextResponse.json({ error: `POP3 연결 실패 (모든 호스트 시도): ${String(connectErr)}` }, { status: 500 });
   }
+  console.log(`[POP3] using host: ${connectedHost}`);
 
   try {
 
