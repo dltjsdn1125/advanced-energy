@@ -844,6 +844,26 @@ export default function OutlookPage() {
         .catch(() => {});
     }
 
+    // If webmail credentials exist but PROTO_KEY is stale (imap/pop3), clear old cache
+    // so loadMessages doesn't hit the 20-email IMAP cache and return early.
+    try {
+      const raw = localStorage.getItem("ae_settings_v1");
+      if (raw) {
+        const cfg = JSON.parse(raw) as Record<string, unknown>;
+        const popHost = String(cfg.popHost ?? "");
+        const popUser = String(cfg.popUser ?? "");
+        const popPass = String(cfg.popPass ?? "");
+        const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
+        if (popHost && popUser && popPass && currentProto !== "webmail") {
+          localStorage.setItem(PROTO_KEY, "webmail");
+          sessionStorage.removeItem(CACHE_KEY);
+          localStorage.removeItem(LS_CACHE_KEY);
+          msgCache.current.clear();
+          msgCacheTs.current.clear();
+        }
+      }
+    } catch {}
+
     loadMessages("inbox").then(() => {
       // Prefetch all other folders after inbox loads — use webmail API when applicable
       setTimeout(async () => {
