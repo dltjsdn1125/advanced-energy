@@ -2670,6 +2670,19 @@ export default function OutlookPage() {
               className="flex-1 bg-transparent text-[12px] text-white placeholder:text-white/40 focus:outline-none min-w-0"/>
             {search && <button onClick={() => setSearch("")} className="text-white/50 hover:text-white ml-1 text-[14px] leading-none">×</button>}
           </div>
+          {/* Connection test */}
+          <button title="연결 진단" onClick={async () => {
+            const cfg = JSON.parse(localStorage.getItem("ae_settings_v1") ?? "{}") as Record<string, unknown>;
+            const host = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
+            const user = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
+            const pass = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
+            if (!host) { alert("Settings에 IMAP/POP3 서버 주소가 없습니다."); return; }
+            const res = await fetch("/api/webmail/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host, user, pass }) });
+            const data = await res.json();
+            alert(JSON.stringify(data, null, 2));
+          }} className="flex h-7 shrink-0 items-center justify-center rounded px-1.5 text-[10px] font-bold text-white/70 hover:bg-white/10 hover:text-white">
+            진단
+          </button>
           {/* Refresh */}
           <button
             onClick={async () => { setIsRefreshing(true); try { await loadMessages(activeFolder, true); } finally { setIsRefreshing(false); } }}
