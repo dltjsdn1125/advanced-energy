@@ -757,45 +757,42 @@ export default function OutlookPage() {
         let mailMsgs: OutlookMessage[] | null = null;
         let connError = "";
 
-        if ((folder === "inbox" || folder === "sent") && mailProto !== "webmail") {
-          // 1) IMAP
+        // 1) Webmail — try FIRST (unlimited pagination, all folders, uses popHost/popUser/popPass)
+        try {
+          const session   = getWebmailSession();
+          const firstPage = await fetchWebmailPage(folder, 0, session);
+          if (firstPage !== null) {
+            saveWebmailSession(firstPage.sessionCookie);
+            mailMsgs = firstPage.messages;
+            connError = "";
+            localStorage.setItem(PROTO_KEY, "webmail");
+            if (firstPage.hasMore) {
+              startBackgroundPages(folder, 1, firstPage.sessionCookie);
+            }
+          }
+        } catch (e) {
+          connError = String(e);
+        }
+
+        // 2) IMAP fallback (inbox/sent only — if no webmail credentials)
+        if (mailMsgs === null && (folder === "inbox" || folder === "sent")) {
           const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
           if ("ok" in imapResult && imapResult.ok !== null) {
             mailMsgs = imapResult.ok;
             localStorage.setItem(PROTO_KEY, "imap");
           } else if ("err" in imapResult) {
-            connError = imapResult.err;
-          }
-
-          // 2) POP3
-          if (mailMsgs === null) {
-            const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-            if ("ok" in pop3Result && pop3Result.ok !== null) {
-              mailMsgs = pop3Result.ok;
-              localStorage.setItem(PROTO_KEY, "pop3");
-            } else if ("err" in pop3Result) {
-              connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
-            }
+            connError = connError ? `${connError}\n${imapResult.err}` : imapResult.err;
           }
         }
 
-        // 3) Webmail — client-driven pagination (page 0 shown immediately, rest in background)
+        // 3) POP3 fallback (last resort)
         if (mailMsgs === null) {
-          try {
-            const session   = getWebmailSession();
-            const firstPage = await fetchWebmailPage(folder, 0, session);
-            if (firstPage !== null) {
-              saveWebmailSession(firstPage.sessionCookie);
-              mailMsgs = firstPage.messages;
-              connError = "";
-              localStorage.setItem(PROTO_KEY, "webmail");
-              // Pages 1+ load in background and append to the list
-              if (firstPage.hasMore) {
-                startBackgroundPages(folder, 1, firstPage.sessionCookie);
-              }
-            }
-          } catch (e) {
-            connError = connError ? `${connError}\n${String(e)}` : String(e);
+          const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+          if ("ok" in pop3Result && pop3Result.ok !== null) {
+            mailMsgs = pop3Result.ok;
+            localStorage.setItem(PROTO_KEY, "pop3");
+          } else if ("err" in pop3Result) {
+            connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
           }
         }
 
