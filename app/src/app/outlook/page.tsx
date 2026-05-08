@@ -378,13 +378,20 @@ async function fetchWebmailPage(
 ): Promise<WebmailPageResult | null> {
   try {
     const raw = localStorage.getItem("ae_settings_v1");
-    if (!raw) return null;
+    if (!raw) {
+      console.warn("[fetchWebmailPage] no ae_settings_v1 in localStorage");
+      return null;
+    }
     const cfg  = JSON.parse(raw) as Record<string, unknown>;
     // Prefer POP3 credentials; fall back to IMAP (same MAILNARA server address)
     const host = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
     const user = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
     const pass = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
-    if (!host || !user || !pass) return null;
+    if (!host || !user || !pass) {
+      console.warn(`[fetchWebmailPage] missing creds host=${!!host} user=${!!user} pass=${!!pass}`);
+      return null;
+    }
+    console.log(`[fetchWebmailPage] folder=${folder} page=${page} host=${host} user=${user}`);
     const res = await fetch("/api/webmail/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
