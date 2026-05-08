@@ -15,7 +15,7 @@ interface ThreadMessage {
   entryId: string; subject: string;
   senderName: string; senderEmail: string; sentOn: string;
   body: string; htmlBody: string;
-  attachments: { name: string; size: number; contentType?: string; content?: string }[];
+  attachments: { name: string; size: number; contentType?: string; content?: string; downloadUrl?: string }[];
   recipients: { name: string; email: string; rtype: number }[];
 }
 type Tone         = "neutral" | "positive" | "negative" | "custom";
@@ -1149,8 +1149,11 @@ export default function OutlookPage() {
     finally { setThreadLoading(false); }
   }
 
-  function downloadAtt(entryId: string, att: { name: string; contentType?: string; content?: string }) {
-    // IMAP / webmail attachments arrive as base64 in the thread response — convert to blob URL
+  async function downloadAtt(
+    entryId: string,
+    att: { name: string; contentType?: string; content?: string; downloadUrl?: string },
+  ) {
+    // 1) IMAP path — base64 content is already in the response
     if (att.content) {
       try {
         const binary = atob(att.content);
@@ -1159,18 +1162,49 @@ export default function OutlookPage() {
         const blob = new Blob([bytes], { type: att.contentType || "application/octet-stream" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url;
-        a.download = att.name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        a.href = url; a.download = att.name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30_000);
+        return;
+      } catch (e) { console.error("[downloadAtt] blob fail:", e); }
+    }
+
+    // 2) Webmail path — proxy through MAILNARA session via /api/webmail/attachment
+    if (entryId.startsWith("web-") && att.downloadUrl) {
+      try {
+        const raw = localStorage.getItem("ae_settings_v1");
+        const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+        const res = await fetch("/api/webmail/attachment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            host:          String(cfg.popHost ?? "") || String(cfg.imapHost ?? ""),
+            user:          String(cfg.popUser ?? "") || String(cfg.imapUser ?? ""),
+            pass:          String(cfg.popPass ?? "") || String(cfg.imapPass ?? ""),
+            sessionCookie: getWebmailSession(),
+            downloadUrl:   att.downloadUrl,
+            filename:      att.name,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error((data as { error?: string }).error || `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = att.name;
+        document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30_000);
         return;
       } catch (e) {
-        console.error("[downloadAtt] blob fail:", e);
+        console.error("[downloadAtt] webmail proxy fail:", e);
+        alert("첨부파일 다운로드 실패: " + String(e));
+        return;
       }
     }
-    // Outlook COM fallback (Windows desktop)
+
+    // 3) Outlook COM fallback (Windows desktop only)
     window.open(`/api/outlook/attachment?${new URLSearchParams({ entryId, name: att.name })}`, "_blank");
   }
 

@@ -131,6 +131,8 @@ interface AttachmentMeta {
   size: number;
   contentType?: string;
   content?: string;
+  /** MAILNARA download URL (relative or absolute) — used for proxy download */
+  downloadUrl?: string;
 }
 
 // Decode percent-encoded UTF-8 strings safely
@@ -200,7 +202,7 @@ async function fetchAttachmentList(
 function parseAttachmentsFromHtml(html: string): AttachmentMeta[] {
   const list: AttachmentMeta[] = [];
 
-  // Pattern 1: anchors with download-ish hrefs
+  // Pattern 1: anchors with download-ish hrefs (PRIMARY — gives us href)
   const linkPattern = /<a\b[^>]*?href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = linkPattern.exec(html)) !== null) {
@@ -217,27 +219,35 @@ function parseAttachmentsFromHtml(html: string): AttachmentMeta[] {
     const sm = inner.match(/^(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]\s*$/i);
     const name = tryDecodeURI(sm ? sm[1].trim() : inner);
     const size = sm ? parseSize(sm[2]) : 0;
-    list.push({ name, size });
+    list.push({ name, size, downloadUrl: href });
   }
 
-  // Pattern 2: MAILNARA attachment row containers
+  // Pattern 2: MAILNARA attachment row containers — also try to find a download href inside
   const rowPattern = /<(?:li|tr|div|span)\b[^>]*class=["'][^"']*(?:m-file|attach|file_list|file_row|file_name|attachfile)[^"']*["'][^>]*>([\s\S]*?)<\/(?:li|tr|div|span)>/gi;
   while ((m = rowPattern.exec(html)) !== null) {
     const inner = m[1];
     const txt = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     if (!txt || txt.length > 300) continue;
     const sm = txt.match(/(.+?\.[a-z0-9]{1,5})\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]/i);
-    if (sm) list.push({ name: tryDecodeURI(sm[1].trim()), size: parseSize(sm[2]) });
+    if (!sm) continue;
+    // Look for a download href inside this row — could be on a different element
+    const hrefInRow = inner.match(/href=["']([^"']*?(?:download|attach|maildownload|mail_attach|attachment|file_down)[^"']*?)["']/i);
+    list.push({
+      name: tryDecodeURI(sm[1].trim()),
+      size: parseSize(sm[2]),
+      downloadUrl: hrefInRow ? hrefInRow[1] : undefined,
+    });
   }
 
-  // Dedupe by name
-  const seen = new Set<string>();
-  return list.filter(a => {
+  // Dedupe by name (prefer entries that have a download URL)
+  const byName = new Map<string, AttachmentMeta>();
+  for (const a of list) {
     const k = a.name.toLowerCase();
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
+    const existing = byName.get(k);
+    if (!existing) byName.set(k, a);
+    else if (!existing.downloadUrl && a.downloadUrl) byName.set(k, a);
+  }
+  return Array.from(byName.values());
 }
 
 async function fetchBody(
