@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getToken } from "@/lib/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface OutlookMessage {
@@ -876,34 +876,65 @@ export default function OutlookPage() {
         .catch(() => {});
     }
 
-    // One-time migration from webmail to IMAP: only runs once per browser, even if
-    // IMAP later fails. After this, the cache is preserved across navigation.
-    try {
-      const migrationDone = localStorage.getItem("ae_imap_migration_v1") === "1";
-      const raw = localStorage.getItem("ae_settings_v1");
-      if (!migrationDone && raw) {
+    // Auto-sync settings from cloud when localStorage has no IMAP creds.
+    // Without this, a user who only Saved settings on another device would land
+    // here with empty creds and see no mail at all.
+    async function ensureSettings() {
+      try {
+        const raw = localStorage.getItem("ae_settings_v1");
+        const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+        const hasCreds = !!String(cfg.imapHost ?? "") && !!String(cfg.imapUser ?? "") && !!String(cfg.imapPass ?? "");
+        if (hasCreds) return;
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch("/api/settings", { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json() as Record<string, unknown>;
+        const next: Record<string, unknown> = { ...cfg };
+        const map: Record<string, string> = {
+          openai_key: "openaiKey", telegram_token: "telegramToken", telegram_chat_id: "telegramChatId",
+          daily_start_time: "dailyStartTime", daily_end_time: "dailyEndTime",
+          imap_host: "imapHost", imap_port: "imapPort", imap_ssl: "imapSsl", imap_user: "imapUser", imap_pass: "imapPass",
+          smtp_host: "smtpHost", smtp_port: "smtpPort", smtp_ssl: "smtpSsl",
+          pop_host: "popHost", pop_port: "popPort", pop_ssl: "popSsl", pop_user: "popUser", pop_pass: "popPass",
+          pop_leave_on_server: "popLeaveOnServer",
+        };
+        for (const [from, to] of Object.entries(map)) {
+          if (data[from] !== undefined && data[from] !== null && data[from] !== "") next[to] = data[from];
+        }
+        localStorage.setItem("ae_settings_v1", JSON.stringify(next));
+      } catch { /* ignore — non-critical */ }
+    }
+
+    // One-time migration from webmail to IMAP — only runs once per browser
+    function migrateProtoIfNeeded() {
+      try {
+        const migrationDone = localStorage.getItem("ae_imap_migration_v1") === "1";
+        const raw = localStorage.getItem("ae_settings_v1");
+        if (migrationDone || !raw) return;
         const cfg = JSON.parse(raw) as Record<string, unknown>;
         const imapHost = String(cfg.imapHost ?? "");
         const imapUser = String(cfg.imapUser ?? "");
         const imapPass = String(cfg.imapPass ?? "");
-        if (imapHost && imapUser && imapPass) {
-          const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
-          const cachedInbox  = msgCache.current.get("inbox") ?? [];
-          const hasWebmailCache = cachedInbox.length > 0 && cachedInbox[0].entryId.startsWith("web-");
-          if (currentProto === "webmail" || hasWebmailCache) {
-            localStorage.setItem(PROTO_KEY, "imap");
-            sessionStorage.removeItem(CACHE_KEY);
-            localStorage.removeItem(LS_CACHE_KEY);
-            msgCache.current.clear();
-            msgCacheTs.current.clear();
-            setMessages([]);
-          }
-          localStorage.setItem("ae_imap_migration_v1", "1");
+        if (!imapHost || !imapUser || !imapPass) return;
+        const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
+        const cachedInbox  = msgCache.current.get("inbox") ?? [];
+        const hasWebmailCache = cachedInbox.length > 0 && cachedInbox[0].entryId.startsWith("web-");
+        if (currentProto === "webmail" || hasWebmailCache) {
+          localStorage.setItem(PROTO_KEY, "imap");
+          sessionStorage.removeItem(CACHE_KEY);
+          localStorage.removeItem(LS_CACHE_KEY);
+          msgCache.current.clear();
+          msgCacheTs.current.clear();
+          setMessages([]);
         }
-      }
-    } catch {}
+        localStorage.setItem("ae_imap_migration_v1", "1");
+      } catch {}
+    }
 
-    loadMessages("inbox").then(() => {
+    ensureSettings().then(() => {
+      migrateProtoIfNeeded();
+      loadMessages("inbox").then(() => {
       // Prefetch other folders after inbox loads. IMAP route only supports INBOX,
       // so for sent/drafts/deleted/junk we always fall back to webmail.
       setTimeout(async () => {
@@ -931,6 +962,7 @@ export default function OutlookPage() {
           }
         }
       }, 1500);
+      });
     });
   }, []); // eslint-disable-line
 

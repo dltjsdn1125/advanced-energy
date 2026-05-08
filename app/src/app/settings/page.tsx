@@ -217,6 +217,11 @@ export default function SettingsPage() {
           }
         }
         setCfg(merged);
+        // Persist cloud-synced config to localStorage so other pages (Outlook etc.)
+        // can read IMAP/SMTP/POP credentials without requiring a manual Save click
+        // on this device. Previously this was state-only, so a user who only Saved
+        // on mobile would have no creds locally on desktop.
+        saveLocal(merged);
         setCloudSync(true);
       } catch {
         // local fallback already applied above
