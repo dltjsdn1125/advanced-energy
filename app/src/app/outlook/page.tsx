@@ -481,6 +481,7 @@ export default function OutlookPage() {
   const [composeBody,    setComposeBody]    = useState("");
   const [composeSending, setComposeSending] = useState(false);
   const [composeQuoteH,  setComposeQuoteH]  = useState(200);
+  const [composeAiOpen,  setComposeAiOpen]  = useState(false);
   const [sendSuccess,    setSendSuccess]    = useState(false);
   const [sendSuccessOut, setSendSuccessOut] = useState(false);
 
@@ -1176,6 +1177,7 @@ export default function OutlookPage() {
     setComposeBody("");
     setReplyStatus("");
     setComposeQuoteH(200);
+    setComposeAiOpen(false);
 
     const latest = thread[thread.length - 1];
     const me = senderEmail.toLowerCase().trim();
@@ -2344,12 +2346,24 @@ export default function OutlookPage() {
           style={{ maxHeight: "calc(100dvh - 48px)" }}>
           {/* Title bar */}
           <div className="flex shrink-0 items-center justify-between rounded-t-xl bg-[#0f3460] px-4 py-2.5">
-            <span className="text-[13px] font-semibold text-white">
+            <span className="text-[13px] font-semibold text-white min-w-0 truncate mr-2">
               {replyAction === "reply" ? "Reply" : replyAction === "replyAll" ? "Reply All" : "Forward"}
-              {selected && <span className="ml-2 font-normal text-white/60 truncate max-w-[280px] inline-block align-bottom text-[11px]">{selected.subject}</span>}
+              {selected && <span className="ml-2 font-normal text-white/60 text-[11px]">{selected.subject}</span>}
             </span>
-            <button onClick={() => { setComposeOpen(false); setComposeBody(""); }}
-              className="flex h-6 w-6 items-center justify-center rounded text-white/60 hover:text-white hover:bg-white/20 text-[18px] leading-none">×</button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                onClick={() => setComposeAiOpen(o => !o)}
+                className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold transition ${
+                  composeAiOpen ? "bg-white text-[#0f3460]" : "bg-white/20 text-white hover:bg-white/30"
+                }`}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill={composeAiOpen ? "#0f3460" : "none"}/>
+                </svg>
+                AI
+              </button>
+              <button onClick={() => { setComposeOpen(false); setComposeBody(""); setComposeAiOpen(false); }}
+                className="flex h-6 w-6 items-center justify-center rounded text-white/60 hover:text-white hover:bg-white/20 text-[18px] leading-none">×</button>
+            </div>
           </div>
           {/* To */}
           <div className="flex shrink-0 items-center border-b border-ink-100 px-4">
@@ -2452,6 +2466,107 @@ export default function OutlookPage() {
               </div>
             );
           })()}
+          {/* ── AI panel inside compose (collapsible) ───────────────── */}
+          {composeAiOpen && (
+            <div className="shrink-0 border-t-2 border-[#0f3460]/20 bg-[#f3f6fb]">
+              <div className="px-4 py-3 space-y-3">
+                {/* From */}
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={senderName} onChange={e => { setSenderName(e.target.value); if (senderLocked) localStorage.setItem("ae_sender_name", e.target.value); }}
+                    placeholder="Your Name"
+                    className="rounded border border-ink-200 bg-white px-2.5 py-1.5 text-[12px] focus:border-[#0f3460] focus:outline-none"/>
+                  <input value={senderEmail} onChange={e => { setSenderEmail(e.target.value); if (senderLocked) localStorage.setItem("ae_sender_email", e.target.value); }}
+                    placeholder="Your Email"
+                    className="rounded border border-ink-200 bg-white px-2.5 py-1.5 text-[12px] focus:border-[#0f3460] focus:outline-none"/>
+                </div>
+                {/* Purpose */}
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="text-[11px] font-semibold text-ink-600">Purpose / Request</p>
+                    {purpose && <button onClick={() => setPurpose("")} className="text-[11px] text-ink-400 hover:text-red-500">Clear</button>}
+                  </div>
+                  <textarea value={purpose} onChange={e => setPurpose(e.target.value)}
+                    placeholder="e.g. Delivery schedule inquiry, quote request, technical Q&A reply"
+                    rows={2}
+                    className="w-full rounded border border-ink-200 bg-white px-2.5 py-1.5 text-[12px] focus:border-[#0f3460] focus:outline-none resize-none"/>
+                </div>
+                {/* Tone */}
+                <div>
+                  <p className="mb-1.5 text-[11px] font-semibold text-ink-600">Tone</p>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(["neutral","positive","negative","custom"] as Tone[]).map(t => (
+                      <button key={t} onClick={() => setTone(t)}
+                        className={`rounded border py-1.5 text-[11px] font-medium transition ${
+                          tone === t ? "border-[#0f3460] bg-[#0f3460] text-white" : "border-ink-200 bg-white text-ink-600 hover:border-[#0f3460]"
+                        }`}>
+                        {TONE_LABELS[t]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {tone === "custom" && (
+                  <textarea value={customNote} onChange={e => setCustomNote(e.target.value)}
+                    placeholder="e.g. Apologize for delay and propose alternatives" rows={2}
+                    className="w-full rounded border border-ink-200 bg-white px-2.5 py-1.5 text-[12px] focus:border-[#0f3460] focus:outline-none resize-none"/>
+                )}
+                {/* Generate Draft */}
+                <button onClick={openAiRecipModal} disabled={!selected || thread.length === 0 || draftLoading}
+                  className={`w-full rounded py-2.5 text-[13px] font-semibold transition ${
+                    !selected || thread.length === 0 || draftLoading
+                      ? "cursor-not-allowed bg-ink-100 text-ink-400"
+                      : "bg-[#0f3460] text-white hover:bg-[#0a2342]"
+                  }`}>
+                  {draftLoading
+                    ? <span className="flex items-center justify-center gap-2"><span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"/>Generating…</span>
+                    : "✨ Generate Draft"}
+                </button>
+                {draftError && (
+                  <div className="rounded border border-red-200 bg-red-50 px-2.5 py-2 text-[12px] text-red-600">{draftError}</div>
+                )}
+                {/* Draft result + insert button */}
+                {draft && (
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <p className="text-[11px] font-semibold text-ink-600">Generated Draft</p>
+                      <button
+                        onClick={() => { setComposeBody(draft); setComposeAiOpen(false); }}
+                        className="flex items-center gap-1 rounded bg-green-500 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-green-600 transition">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        본문에 삽입
+                      </button>
+                    </div>
+                    <textarea value={draft} onChange={e => setDraft(e.target.value)}
+                      className="mono w-full rounded border border-ink-200 bg-white px-2.5 py-2 text-[12px] leading-relaxed focus:border-[#0f3460] focus:outline-none resize-none"
+                      style={{ height: 180 }}/>
+                  </div>
+                )}
+                {/* Summarize */}
+                <div className="flex items-center justify-between border-t border-ink-200 pt-2">
+                  <span className="text-[11px] font-semibold text-ink-600">Summarize</span>
+                  <button onClick={generateSummary} disabled={!selected || summaryLoading}
+                    className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-[12px] font-semibold transition ${
+                      !selected || summaryLoading ? "bg-ink-100 text-ink-400 cursor-not-allowed" : "bg-[#0f3460] text-white hover:bg-[#0a2342]"
+                    }`}>
+                    {summaryLoading
+                      ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent inline-block"/>요약 중…</>
+                      : <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.6"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                          Summarize
+                        </>
+                    }
+                  </button>
+                </div>
+                {summaryError && (
+                  <div className="rounded border border-red-200 bg-red-50 px-2.5 py-2 text-[12px] text-red-600">{summaryError}</div>
+                )}
+                {summaryText && (
+                  <div className="rounded border border-ink-200 bg-white px-3 py-2.5 text-[12px] text-ink-700 leading-relaxed whitespace-pre-wrap">
+                    {summaryText}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           </div>{/* end scrollable body */}
           {/* Footer */}
           <div className="flex shrink-0 flex-col gap-2 border-t border-ink-100 px-4 py-3">
