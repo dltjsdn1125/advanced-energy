@@ -430,22 +430,13 @@ export default function OutlookPage() {
   const [openaiKey,    setOpenaiKey]    = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Synchronously hydrate from cache so the inbox displays immediately on remount
-  // (previously this was done in useEffect, which caused a brief empty flash).
-  const initialCache = (() => {
-    if (typeof window === "undefined") return { msgs: [] as OutlookMessage[], all: {} as Record<string, { ts?: number; data?: OutlookMessage[] }> };
-    try {
-      const raw = sessionStorage.getItem(CACHE_KEY) ?? localStorage.getItem(LS_CACHE_KEY);
-      if (!raw) return { msgs: [] as OutlookMessage[], all: {} as Record<string, { ts?: number; data?: OutlookMessage[] }> };
-      const parsed = JSON.parse(raw) as Record<string, { ts?: number; data?: OutlookMessage[] }>;
-      return { msgs: parsed?.inbox?.data ?? [], all: parsed };
-    } catch { return { msgs: [] as OutlookMessage[], all: {} as Record<string, { ts?: number; data?: OutlookMessage[] }> }; }
-  })();
-
-  const [messages,      setMessages]      = useState<OutlookMessage[]>(initialCache.msgs);
+  // Note: cache is hydrated in a useEffect (line ~602) — initializing from
+  // localStorage in useState causes a server/client hydration mismatch
+  // (React error #418) since the server renders without storage access.
+  const [messages,      setMessages]      = useState<OutlookMessage[]>([]);
   const [msgLoading,    setMsgLoading]    = useState(false);
   const [isRefreshing,  setIsRefreshing]  = useState(false);
-  const [loadingCount,  setLoadingCount]  = useState(initialCache.msgs.length);
+  const [loadingCount,  setLoadingCount]  = useState(0);
   const [msgError,      setMsgError]      = useState<string | null>(null);
   const [activeFolder, setActiveFolder] = useState<Folder>("inbox");
   const [search,       setSearch]       = useState("");
@@ -463,23 +454,9 @@ export default function OutlookPage() {
   const [iframeH,       setIframeH]       = useState<Record<number, number>>({});
   const [iframeW,       setIframeW]       = useState<Record<number, number>>({});
 
-  // In-memory caches — hydrated synchronously from storage on mount
-  const msgCache        = useRef<Map<Folder, OutlookMessage[]>>((() => {
-    const m = new Map<Folder, OutlookMessage[]>();
-    for (const f of REAL_FOLDERS) {
-      const row = initialCache.all?.[f];
-      if (row && Array.isArray(row.data)) m.set(f, row.data);
-    }
-    return m;
-  })());
-  const msgCacheTs      = useRef<Map<Folder, number>>((() => {
-    const m = new Map<Folder, number>();
-    for (const f of REAL_FOLDERS) {
-      const row = initialCache.all?.[f];
-      if (row && typeof row.ts === "number") m.set(f, row.ts);
-    }
-    return m;
-  })());
+  // In-memory caches — hydrated in a useEffect (line ~602) to avoid SSR mismatch
+  const msgCache        = useRef<Map<Folder, OutlookMessage[]>>(new Map());
+  const msgCacheTs      = useRef<Map<Folder, number>>(new Map());
   const threadCache     = useRef<Map<string, ThreadMessage[]>>(new Map());
   // Ref so background async tasks can check the current folder without stale closure
   const activeFolderRef  = useRef<Folder>("inbox");
