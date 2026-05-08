@@ -1288,24 +1288,86 @@ export default function OutlookPage() {
     setRecipOpen(true);
   }
 
+  // Shared SMTP helper — used by every send path (compose dialog, AI flow,
+  // direct forward). Outlook COM is unavailable on Vercel/Linux.
+  async function sendMailViaSmtp(opts: { to: string; cc: string; subject: string; htmlBody: string }): Promise<void> {
+    const raw = localStorage.getItem("ae_settings_v1");
+    const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+    const smtpHost = String(cfg.smtpHost ?? "") || String(cfg.imapHost ?? "");
+    const smtpPort = Number(cfg.smtpPort) || 587;
+    const ssl      = cfg.smtpSsl !== false;
+    const user     = String(cfg.imapUser ?? cfg.popUser ?? "");
+    const pass     = String(cfg.imapPass ?? cfg.popPass ?? "");
+    if (!smtpHost || !user || !pass) {
+      throw new Error("SMTP 설정이 필요합니다 (설정 → SMTP/IMAP).");
+    }
+    const res = await fetch("/api/mail/send", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        smtpHost, smtpPort, ssl, user, pass,
+        to: opts.to, cc: opts.cc, subject: opts.subject, htmlBody: opts.htmlBody,
+      }),
+    });
+    const data = await res.json() as { error?: string; ok?: boolean };
+    if (data?.error) throw new Error(data.error);
+  }
+
+  // Build the quoted thread + final HTML body for a reply/forward.
+  function buildReplyHtml(action: "reply" | "replyAll" | "forward", userText: string): { subject: string; html: string } {
+    const escape = (s: string) =>
+      s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const userBodyHtml = `<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${
+      escape(userText).replace(/\n/g,"<br>")
+    }</div>`;
+
+    const orig = selected?.subject ?? "";
+    const subject = action === "forward"
+      ? (/^(fw|fwd)\s*:/i.test(orig) ? orig : `Fwd: ${orig}`)
+      : (/^re\s*:/i.test(orig) ? orig : `Re: ${orig}`);
+
+    const msgs = thread.length > 0 ? [...thread].reverse() : (selected ? [{
+      senderName:  selected.senderName,
+      senderEmail: selected.senderEmail,
+      sentOn:      selected.receivedTime,
+      htmlBody:    "",
+      body:        "",
+    } as ThreadMessage] : []);
+
+    const quotedParts: string[] = [];
+    for (const m of msgs) {
+      const bodyContent = m.htmlBody
+        ? (m.htmlBody.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? m.htmlBody)
+        : escape(m.body || "").replace(/\n/g, "<br>");
+      const senderDisp = m.senderName
+        ? `${escape(m.senderName)} &lt;${escape(m.senderEmail)}&gt;`
+        : escape(m.senderEmail);
+      quotedParts.push(
+        `<hr style="border:none;border-top:1px solid #ccc;margin:14px 0">` +
+        `<div style="font-family:Calibri,Arial,sans-serif;font-size:12px;color:#666;margin-bottom:6px">` +
+        `<b>보낸 사람:</b> ${senderDisp}<br>` +
+        `<b>보낸 날짜:</b> ${escape(m.sentOn ?? "")}<br>` +
+        `<b>제목:</b> ${escape(orig)}` +
+        `</div><div style="font-family:Calibri,Arial,sans-serif;font-size:13px;color:#1a1a1a">${bodyContent}</div>`
+      );
+    }
+    return { subject, html: userBodyHtml + quotedParts.join("") };
+  }
+
   async function handleRecipConfirm(to: RecipAddr[], cc: RecipAddr[]) {
     setRecipOpen(false);
     if (recipMode === "ai") {
       setAiTo(to); setAiCc(cc);
       await generateDraft(to, cc);
     } else if ((recipMode as string) === "forward") {
-      // Direct forward — no AI draft needed
+      // Direct forward via SMTP
       const toStr = to.map(a => a.email).join("; ");
       const ccStr = cc.map(a => a.email).join("; ");
-      setReplyStatus("전달 창 여는 중…");
+      setReplyStatus("전달 발송 중…");
       try {
-        const res = await fetch("/api/outlook/reply", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ entryId: selected!.entryId, body: "", send: false, to: toStr, cc: ccStr, action: "forward" }),
-        });
-        const data = await res.json();
-        if (data?.error) throw new Error(data.error);
-        setReplyStatus("✓ 전달 창이 열렸습니다.");
+        const { subject, html } = buildReplyHtml("forward", "");
+        await sendMailViaSmtp({ to: toStr, cc: ccStr, subject, htmlBody: html });
+        setReplyStatus("✓ 전달 발송 완료!");
+        setTimeout(() => setReplyStatus(""), 4000);
       } catch (e: unknown) { setReplyStatus("오류: " + String(e)); }
     } else {
       await executeReply(to, cc, pendingSend);
@@ -1314,17 +1376,20 @@ export default function OutlookPage() {
 
   async function executeReply(to: RecipAddr[], cc: RecipAddr[], send: boolean) {
     const label = replyAction === "forward" ? "전달" : replyAction === "replyAll" ? "전체 회신" : "회신";
-    setReplyStatus(send ? `${label} 발송 중…` : `${label} 창 여는 중…`);
+    if (!send) {
+      // "Open window without sending" no longer applies — Outlook desktop is
+      // unavailable on Vercel. Just keep the draft in the compose pane.
+      setReplyStatus(`✓ 작성 패널에 유지됨 (Send 클릭 시 발송)`);
+      setTimeout(() => setReplyStatus(""), 4000);
+      return;
+    }
+    setReplyStatus(`${label} 발송 중…`);
     try {
       const toStr = to.map(a => a.email).join("; ");
       const ccStr = cc.map(a => a.email).join("; ");
-      const res = await fetch("/api/outlook/reply", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ entryId: selected!.entryId, body: draft, send, to: toStr, cc: ccStr, action: replyAction }),
-      });
-      const data = await res.json();
-      if (data?.error) throw new Error(data.error);
-      setReplyStatus(send ? `✓ ${label} 발송 완료!` : `✓ ${label} 창이 열렸습니다.`);
+      const { subject, html } = buildReplyHtml(replyAction, draft);
+      await sendMailViaSmtp({ to: toStr, cc: ccStr, subject, htmlBody: html });
+      setReplyStatus(`✓ ${label} 발송 완료!`);
       setTimeout(() => setReplyStatus(""), 4000);
     } catch (e: unknown) { setReplyStatus("오류: " + String(e)); }
   }
@@ -1389,47 +1454,77 @@ export default function OutlookPage() {
     setComposeSending(true);
     setReplyStatus("발송 중…");
     try {
-      let data: { error?: string; ok?: boolean };
+      // All modes go through SMTP — Outlook COM only works on Windows desktop
+      // and the reply/forward route shells out to powershell.exe which is
+      // unavailable on the Vercel/Linux deployment.
+      const raw = localStorage.getItem("ae_settings_v1");
+      const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+      const smtpHost = String(cfg.smtpHost ?? "") || String(cfg.imapHost ?? "");
+      const smtpPort = Number(cfg.smtpPort) || 587;
+      const ssl      = cfg.smtpSsl !== false;
+      const user     = String(cfg.imapUser ?? cfg.popUser ?? "");
+      const pass     = String(cfg.imapPass ?? cfg.popPass ?? "");
+      if (!smtpHost || !user || !pass) {
+        throw new Error("SMTP 설정이 필요합니다 (설정 → SMTP/IMAP).");
+      }
+
+      // Build subject + quoted thread for reply/forward modes
+      let subject = composeSubject;
+      let html: string;
+      const escape = (s: string) =>
+        s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      const userBodyHtml = `<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${
+        escape(composeBody).replace(/\n/g,"<br>")
+      }</div>`;
 
       if (composeMode === "new") {
-        // New mail: SMTP send (no entryId, no thread quote)
-        const raw = localStorage.getItem("ae_settings_v1");
-        const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
-        const smtpHost = String(cfg.smtpHost ?? "");
-        const smtpPort = Number(cfg.smtpPort) || 587;
-        const ssl      = cfg.smtpSsl !== false;
-        const user     = String(cfg.imapUser ?? cfg.popUser ?? "");
-        const pass     = String(cfg.imapPass ?? cfg.popPass ?? "");
-        if (!smtpHost || !user || !pass) {
-          throw new Error("SMTP 설정이 필요합니다 (설정 → SMTP/IMAP).");
+        html = userBodyHtml;
+      } else if (selected) {
+        // Reply / replyAll / forward — derive subject + quote thread
+        const orig = selected.subject ?? "";
+        if (replyAction === "forward") {
+          subject = /^(fw|fwd)\s*:/i.test(orig) ? orig : `Fwd: ${orig}`;
+        } else {
+          subject = /^re\s*:/i.test(orig) ? orig : `Re: ${orig}`;
         }
-        const html = `<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${
-          composeBody.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")
-        }</div>`;
-        const res = await fetch("/api/mail/send", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            smtpHost, smtpPort, ssl, user, pass,
-            to: composeToStr, cc: composeCcStr,
-            subject: composeSubject, htmlBody: html,
-          }),
-        });
-        data = await res.json();
+        const quotedParts: string[] = [];
+        const msgs = thread.length > 0 ? [...thread].reverse() : [{
+          senderName:  selected.senderName,
+          senderEmail: selected.senderEmail,
+          sentOn:      selected.receivedTime,
+          htmlBody:    "",
+          body:        "",
+        } as ThreadMessage];
+        for (const m of msgs) {
+          const bodyContent = m.htmlBody
+            ? (m.htmlBody.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? m.htmlBody)
+            : escape(m.body || "").replace(/\n/g, "<br>");
+          const senderDisp = m.senderName
+            ? `${escape(m.senderName)} &lt;${escape(m.senderEmail)}&gt;`
+            : escape(m.senderEmail);
+          quotedParts.push(
+            `<hr style="border:none;border-top:1px solid #ccc;margin:14px 0">` +
+            `<div style="font-family:Calibri,Arial,sans-serif;font-size:12px;color:#666;margin-bottom:6px">` +
+            `<b>보낸 사람:</b> ${senderDisp}<br>` +
+            `<b>보낸 날짜:</b> ${escape(m.sentOn ?? "")}<br>` +
+            `<b>제목:</b> ${escape(orig)}` +
+            `</div><div style="font-family:Calibri,Arial,sans-serif;font-size:13px;color:#1a1a1a">${bodyContent}</div>`
+          );
+        }
+        html = userBodyHtml + quotedParts.join("");
       } else {
-        // Reply / replyAll / forward — needs Outlook entryId (Windows desktop only)
-        const res = await fetch("/api/outlook/reply", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            entryId: selected!.entryId,
-            body: composeBody,
-            send: true,
-            to: composeToStr,
-            cc: composeCcStr,
-            action: replyAction,
-          }),
-        });
-        data = await res.json();
+        html = userBodyHtml;
       }
+
+      const res = await fetch("/api/mail/send", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          smtpHost, smtpPort, ssl, user, pass,
+          to: composeToStr, cc: composeCcStr,
+          subject, htmlBody: html,
+        }),
+      });
+      const data = await res.json() as { error?: string; ok?: boolean };
 
       if (data?.error) throw new Error(data.error);
       setComposeOpen(false);
