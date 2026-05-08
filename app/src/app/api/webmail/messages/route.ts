@@ -167,16 +167,25 @@ export async function POST(request: NextRequest) {
     // ── Single-page mode (client-driven pagination) ──────────────────────────
     if (pageParam !== undefined) {
       const listUrl = `https://${host}/new_mailnara_web/index.php/mail/mail_list/${mailbox}/${pageParam}/${PAGE_SIZE}`;
-      const listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
+      let listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
       if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
-      const html = await listResp.text();
-      // Detect redirect to login page (session not working)
-      if (pageParam === 0 && !html.includes("row_id_")) {
-        const isLoginPage = /login\.php|login_id|login_passwd/i.test(html);
-        const snippet = html.slice(0, 300).replace(/\s+/g, " ");
-        console.log(`[WEBMAIL] page0 no row_id_. isLoginPage=${isLoginPage} snippet: ${snippet}`);
-        if (isLoginPage) throw new Error(`웹메일 세션 만료 또는 로그인 실패. 서버 응답: ${snippet}`);
+      let html = await listResp.text();
+
+      // If session expired (login page in response), re-login once and retry
+      const isLoginPage = (h: string) => /login\.php|login_id|login_passwd/i.test(h) && !h.includes("row_id_");
+      if (isLoginPage(html)) {
+        console.log(`[WEBMAIL] page=${pageParam} session expired — re-login`);
+        const freshCookie = await mailnaraLogin(host, user, pass);
+        listResp = await fetch(listUrl, { headers: { Cookie: freshCookie } });
+        if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
+        html = await listResp.text();
+        if (isLoginPage(html)) throw new Error("웹메일 세션 만료 후 재로그인 실패");
+        // Return fresh cookie so client reuses it for next pages
+        const msgs2 = parseMailList(html, mailbox);
+        console.log(`[WEBMAIL] page=${pageParam} re-login ok got=${msgs2.length}`);
+        return NextResponse.json({ messages: msgs2, hasMore: msgs2.length > 0, sessionCookie: freshCookie });
       }
+
       const msgs = parseMailList(html, mailbox);
       console.log(`[WEBMAIL] single-page mode page=${pageParam} got=${msgs.length}`);
       return NextResponse.json({

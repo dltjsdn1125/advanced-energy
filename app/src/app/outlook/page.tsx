@@ -872,23 +872,25 @@ export default function OutlookPage() {
     } catch {}
 
     loadMessages("inbox").then(() => {
-      // Prefetch all other folders after inbox loads — use webmail API when applicable
+      // Prefetch other folders after inbox page-0 loads.
+      // Webmail: load sequentially to avoid session conflicts with inbox background pagination.
       setTimeout(async () => {
         const proto = localStorage.getItem(PROTO_KEY) ?? "";
         if (proto === "webmail") {
-          // Parallel load all folders simultaneously using the same session cookie
-          const session = getWebmailSession();
-          await Promise.allSettled(
-            (["sent", "drafts", "deleted", "junk"] as Folder[]).map(async f => {
-              const result = await fetchWebmailPage(f, 0, session);
+          for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
+            try {
+              const session = getWebmailSession();
+              const result  = await fetchWebmailPage(f, 0, session);
               if (result) {
                 saveWebmailSession(result.sessionCookie);
                 setFolderCache(f, result.messages);
               }
-            })
-          );
+            } catch { /* non-critical, ignore */ }
+            // Small gap between folder loads to avoid hammering the server
+            await new Promise(r => setTimeout(r, 300));
+          }
         } else {
-          // Outlook COM — already parallel (no await)
+          // Outlook COM — fire and forget
           for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
             fetch(`/api/outlook/messages?folder=${f}`)
               .then(r => r.json())
@@ -896,7 +898,7 @@ export default function OutlookPage() {
               .catch(() => {});
           }
         }
-      }, 500);
+      }, 3000); // Wait 3s so inbox background pagination gets a head start
     });
   }, []); // eslint-disable-line
 
