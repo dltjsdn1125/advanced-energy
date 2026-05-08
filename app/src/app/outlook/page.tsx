@@ -673,10 +673,11 @@ export default function OutlookPage() {
     };
 
     // ── Background webmail page loader (runs after page 0 is shown) ──────────
-    // Sequential fetch with one retry per page on failure. Stops on:
-    //   - 2 consecutive empty pages (rowIdCount=0)
-    //   - 3 consecutive pages with the same lastUid (MAILNARA tail)
-    //   - 2 consecutive failed-after-retry pages (server gave up)
+    // CRITICAL: MAILNARA's `page` URL segment is a ROW OFFSET, not a page
+    // number. page=0 returns mails [0..14], page=1 returns mails [1..15] —
+    // each fetch advances the cursor by ONE mail, not 15. To paginate
+    // properly we must increment `page` by the number of mails the previous
+    // call returned (typically 15). 600 mails → 40 calls instead of 600+.
     const startBackgroundPages = (capturedFolder: Folder, startPage: number, initCookie: string) => {
       if (bgLoadingRef.current.has(capturedFolder)) {
         console.log(`[bg pages] ${capturedFolder} already loading — skip`);
@@ -686,50 +687,44 @@ export default function OutlookPage() {
       const MAX_CONSECUTIVE_EMPTY = 2;
       const MAX_CONSECUTIVE_SAME_LASTUID = 3;
       const MAX_CONSECUTIVE_FAILS = 2;
-      const HARD_PAGE_CAP = 200;
+      const HARD_OFFSET_CAP = 5000; // 5000-row safety net (~330 calls of 15)
       (async () => {
-        let page = startPage;
+        let offset = startPage; // semantically a row offset, kept name for compat
         let cookie = initCookie;
         let consecutiveEmpty = 0;
         let consecutiveFails = 0;
         let lastUidSeen = "";
         let lastUidStreak = 0;
         try {
-          while (page < HARD_PAGE_CAP) {
-            // One try + one retry per page (handle transient session blips)
+          while (offset < HARD_OFFSET_CAP) {
+            // One try + one retry per call
             let result: WebmailPageResult | null = null;
             let pageErr: unknown = null;
             for (let attempt = 0; attempt < 2; attempt++) {
               try {
-                result = await fetchWebmailPage(capturedFolder, page, cookie);
+                result = await fetchWebmailPage(capturedFolder, offset, cookie);
                 pageErr = null;
                 break;
               } catch (e) {
                 pageErr = e;
-                if (attempt === 0) {
-                  // Transient — try once more after a brief pause
-                  await new Promise(r => setTimeout(r, 800));
-                }
+                if (attempt === 0) await new Promise(r => setTimeout(r, 800));
               }
             }
             if (pageErr || !result) {
               consecutiveFails++;
-              console.warn(`[bg pages] page=${page} failed (consecutive fails=${consecutiveFails}):`, pageErr);
-              if (consecutiveFails >= MAX_CONSECUTIVE_FAILS) {
-                console.warn(`[bg pages] giving up after ${consecutiveFails} consecutive failures at page=${page}`);
-                break;
-              }
-              page++;
+              console.warn(`[bg pages] offset=${offset} failed (fails=${consecutiveFails}):`, pageErr);
+              if (consecutiveFails >= MAX_CONSECUTIVE_FAILS) break;
+              offset += 15; // skip ahead by a typical page worth and try again
               continue;
             }
             consecutiveFails = 0;
             cookie = result.sessionCookie || cookie;
             saveWebmailSession(cookie);
-            const added = applyMerge(capturedFolder, result.messages, page === 0);
+            const added = applyMerge(capturedFolder, result.messages, offset === 0);
             const msgs = result.messages as Array<{ entryId: string }>;
             const lastEntry = msgs.length > 0 ? msgs[msgs.length - 1].entryId : "";
             const totalNow = msgCache.current.get(capturedFolder)?.length ?? 0;
-            console.log(`[bg pages] page=${page} got=${msgs.length} added=${added} total=${totalNow} lastUid=${lastEntry}`);
+            console.log(`[bg pages] offset=${offset} got=${msgs.length} added=${added} total=${totalNow} lastUid=${lastEntry}`);
             // Empty-page tracker
             if (msgs.length === 0) {
               consecutiveEmpty++;
@@ -737,14 +732,15 @@ export default function OutlookPage() {
                 fullyLoadedRef.current.add(capturedFolder);
                 break;
               }
-            } else {
-              consecutiveEmpty = 0;
+              offset += 15; // step past whatever empty range
+              continue;
             }
+            consecutiveEmpty = 0;
             // Same-lastUid tracker (MAILNARA cursor stuck at tail)
             if (lastEntry && lastEntry === lastUidSeen) {
               lastUidStreak++;
               if (lastUidStreak >= MAX_CONSECUTIVE_SAME_LASTUID) {
-                console.log(`[bg pages] tail reached — lastUid stuck at ${lastEntry} for ${lastUidStreak} pages, stop at page=${page}`);
+                console.log(`[bg pages] tail reached at offset=${offset} (lastUid ${lastEntry} repeated ${lastUidStreak}x)`);
                 fullyLoadedRef.current.add(capturedFolder);
                 break;
               }
@@ -752,13 +748,14 @@ export default function OutlookPage() {
               lastUidSeen = lastEntry;
               lastUidStreak = 1;
             }
-            page++;
+            // Advance the row cursor by however many mails this call returned.
+            // This is the difference between 40 calls and 600 calls.
+            offset += msgs.length;
           }
-          if (page >= HARD_PAGE_CAP) {
-            console.warn(`[bg pages] hit HARD_PAGE_CAP=${HARD_PAGE_CAP} — stopping`);
+          if (offset >= HARD_OFFSET_CAP) {
+            console.warn(`[bg pages] hit HARD_OFFSET_CAP=${HARD_OFFSET_CAP} — stopping`);
           }
         } finally {
-          // Always release the mutex so the next refresh can start a new loop.
           bgLoadingRef.current.delete(capturedFolder);
         }
       })();
