@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
   const user      = String(body.user      ?? "");
   const pass      = String(body.pass      ?? "");
   const entryId   = String(body.entryId   ?? "");
-  const permanent = Boolean(body.permanent ?? false);
+  const sessionCookie = String(body.sessionCookie ?? "");
+  const permanent     = Boolean(body.permanent ?? false);
 
   if (!host || !user || !pass || !entryId) {
     return NextResponse.json({ error: "host, user, pass, entryId 필요" }, { status: 400 });
@@ -54,10 +55,10 @@ export async function POST(request: NextRequest) {
     uid = withoutPrefix.slice(colonIdx + 1);
   }
 
-  console.log(`[WEBMAIL-DELETE] host=${host} mailbox=${mailbox} uid=${uid} permanent=${permanent}`);
+  console.log(`[WEBMAIL-DELETE] host=${host} mailbox=${mailbox} uid=${uid} permanent=${permanent} sessionReuse=${!!sessionCookie}`);
 
   try {
-    const cookie = await mailnaraLogin(host, user, pass);
+    const cookie = sessionCookie || await mailnaraLogin(host, user, pass);
 
     if (permanent) {
       // Permanent delete from server

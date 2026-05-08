@@ -851,17 +851,19 @@ export default function OutlookPage() {
       setTimeout(async () => {
         const proto = localStorage.getItem(PROTO_KEY) ?? "";
         if (proto === "webmail") {
-          for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
-            try {
-              const session = getWebmailSession();
-              const result  = await fetchWebmailPage(f, 0, session);
+          // Parallel load all folders simultaneously using the same session cookie
+          const session = getWebmailSession();
+          await Promise.allSettled(
+            (["sent", "drafts", "deleted", "junk"] as Folder[]).map(async f => {
+              const result = await fetchWebmailPage(f, 0, session);
               if (result) {
                 saveWebmailSession(result.sessionCookie);
                 setFolderCache(f, result.messages);
               }
-            } catch {}
-          }
+            })
+          );
         } else {
+          // Outlook COM — already parallel (no await)
           for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
             fetch(`/api/outlook/messages?folder=${f}`)
               .then(r => r.json())
@@ -955,9 +957,10 @@ export default function OutlookPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            host:        String(cfg.popHost        ?? ""),
-            user:        String(cfg.popUser        ?? ""),
-            pass:        String(cfg.popPass        ?? ""),
+            host:          String(cfg.popHost        ?? ""),
+            user:          String(cfg.popUser        ?? ""),
+            pass:          String(cfg.popPass        ?? ""),
+            sessionCookie: getWebmailSession(),
             uid,
             mailbox,
             subject:     msg.subject,
@@ -1252,7 +1255,7 @@ export default function OutlookPage() {
         res = await fetch("/api/webmail/delete", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ host: cfg.popHost, user: cfg.popUser, pass: cfg.popPass, entryId: msg.entryId, permanent }),
+          body: JSON.stringify({ host: cfg.popHost, user: cfg.popUser, pass: cfg.popPass, sessionCookie: getWebmailSession(), entryId: msg.entryId, permanent }),
         });
       } else {
         res = await fetch("/api/outlook/delete", {
@@ -1313,7 +1316,7 @@ export default function OutlookPage() {
             return fetch("/api/webmail/delete", {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ host: cfg.popHost, user: cfg.popUser, pass: cfg.popPass, entryId, permanent }),
+              body: JSON.stringify({ host: cfg.popHost, user: cfg.popUser, pass: cfg.popPass, sessionCookie: getWebmailSession(), entryId, permanent }),
             });
           }
           return fetch("/api/outlook/delete", {

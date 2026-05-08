@@ -147,24 +147,25 @@ async function fetchBody(
 
 export async function POST(request: NextRequest) {
   const body = await request.json() as Record<string, unknown>;
-  const host        = String(body.host        ?? "");
-  const user        = String(body.user        ?? "");
-  const pass        = String(body.pass        ?? "");
-  const uid         = String(body.uid         ?? "");
-  const mailbox     = String(body.mailbox     ?? "Inbox");
-  const subject     = String(body.subject     ?? "");
-  const senderName  = String(body.senderName  ?? "");
-  const senderEmail = String(body.senderEmail ?? "");
-  const sentOn      = String(body.sentOn      ?? "");
+  const host          = String(body.host          ?? "");
+  const user          = String(body.user          ?? "");
+  const pass          = String(body.pass          ?? "");
+  const sessionCookie = String(body.sessionCookie ?? "");
+  const uid           = String(body.uid           ?? "");
+  const mailbox       = String(body.mailbox       ?? "Inbox");
+  const subject       = String(body.subject       ?? "");
+  const senderName    = String(body.senderName    ?? "");
+  const senderEmail   = String(body.senderEmail   ?? "");
+  const sentOn        = String(body.sentOn        ?? "");
 
   if (!host || !user || !pass || !uid) {
     return NextResponse.json({ error: "webmail 설정이 필요합니다 (host, user, pass, uid)" }, { status: 400 });
   }
 
-  console.log(`[WEBMAIL-THREAD] host=${host} uid=${uid}`);
+  console.log(`[WEBMAIL-THREAD] host=${host} uid=${uid} sessionReuse=${!!sessionCookie}`);
 
   try {
-    const cookie = await mailnaraLogin(host, user, pass);
+    const cookie = sessionCookie || await mailnaraLogin(host, user, pass);
     const { htmlBody, body: plainBody } = await fetchBody(host, cookie, uid, mailbox);
 
     const thread = [{
