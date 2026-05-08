@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
       auth: { user, pass },
       logger: false,
       tls: { rejectUnauthorized: false },
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
+      connectionTimeout: 25_000,
+      greetingTimeout: 25_000,
       socketTimeout: 50_000,
     });
 

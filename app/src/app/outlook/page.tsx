@@ -739,28 +739,39 @@ export default function OutlookPage() {
 
       const capturedFolder = folder;
 
-      // Trigger IMAP background enhancement when available. Uses its own mutex
-      // (imapEnhanceRef) so it can't block the webmail page loop, which uses
-      // bgLoadingRef independently.
+      // Trigger IMAP+POP3 background enhancement in parallel. Whichever returns
+      // more messages than the current cache wins. Uses imapEnhanceRef as a
+      // single mutex so we don't double-fire. Critical: this user has POP3
+      // configured (not IMAP), so POP3 must be tried — IMAP-only would miss it.
       if ((capturedFolder === "inbox" || capturedFolder === "sent")
           && !imapEnhanceRef.current.has(capturedFolder)) {
         imapEnhanceRef.current.add(capturedFolder);
         (async () => {
           try {
-            const imapMsgs = await tryImapFetch(2000);
-            if (Array.isArray(imapMsgs) && imapMsgs.length > 0) {
+            const [imapResult, pop3Result] = await Promise.allSettled([
+              tryImapFetch(2000),
+              tryPop3Fetch(2000),
+            ]);
+            const imapMsgs = imapResult.status === "fulfilled" ? imapResult.value : null;
+            const pop3Msgs = pop3Result.status === "fulfilled" ? pop3Result.value : null;
+            const imapLen = Array.isArray(imapMsgs) ? imapMsgs.length : 0;
+            const pop3Len = Array.isArray(pop3Msgs) ? pop3Msgs.length : 0;
+            console.log(`[bg enhance] IMAP=${imapLen} POP3=${pop3Len}`);
+            const winner = imapLen >= pop3Len ? imapMsgs : pop3Msgs;
+            const winnerProto = imapLen >= pop3Len ? "imap" : "pop3";
+            if (Array.isArray(winner) && winner.length > 0) {
               const cur = msgCache.current.get(capturedFolder) ?? [];
-              if (imapMsgs.length > cur.length) {
-                setFolderCache(capturedFolder, imapMsgs);
+              if (winner.length > cur.length) {
+                setFolderCache(capturedFolder, winner);
                 if (activeFolderRef.current === capturedFolder) {
-                  setMessages(imapMsgs);
-                  setLoadingCount(imapMsgs.length);
+                  setMessages(winner);
+                  setLoadingCount(winner.length);
                 }
-                localStorage.setItem(PROTO_KEY, "imap");
+                localStorage.setItem(PROTO_KEY, winnerProto);
                 fullyLoadedRef.current.add(capturedFolder);
               }
             }
-          } catch (e) { console.warn("[IMAP cache-serve enhance] failed:", e); }
+          } catch (e) { console.warn("[bg enhance] failed:", e); }
           finally { imapEnhanceRef.current.delete(capturedFolder); }
         })();
       }
@@ -939,31 +950,11 @@ export default function OutlookPage() {
       } catch { /* ignore — non-critical */ }
     }
 
-    // One-time migration from webmail to IMAP — only runs once per browser
-    function migrateProtoIfNeeded() {
-      try {
-        const migrationDone = localStorage.getItem("ae_imap_migration_v1") === "1";
-        const raw = localStorage.getItem("ae_settings_v1");
-        if (migrationDone || !raw) return;
-        const cfg = JSON.parse(raw) as Record<string, unknown>;
-        const imapHost = String(cfg.imapHost ?? "");
-        const imapUser = String(cfg.imapUser ?? "");
-        const imapPass = String(cfg.imapPass ?? "");
-        if (!imapHost || !imapUser || !imapPass) return;
-        const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
-        const cachedInbox  = msgCache.current.get("inbox") ?? [];
-        const hasWebmailCache = cachedInbox.length > 0 && cachedInbox[0].entryId.startsWith("web-");
-        if (currentProto === "webmail" || hasWebmailCache) {
-          localStorage.setItem(PROTO_KEY, "imap");
-          sessionStorage.removeItem(CACHE_KEY);
-          localStorage.removeItem(LS_CACHE_KEY);
-          msgCache.current.clear();
-          msgCacheTs.current.clear();
-          setMessages([]);
-        }
-        localStorage.setItem("ae_imap_migration_v1", "1");
-      } catch {}
-    }
+    // Migration logic removed — it was wiping perfectly good caches (e.g., a
+    // mobile cache holding 115 IMAP-loaded messages) when conditions matched.
+    // The cache-serve path now handles mixed webmail/imap entries gracefully
+    // via applyMerge, so no aggressive clearing is needed.
+    function migrateProtoIfNeeded() { /* no-op */ }
 
     // Sync settings from cloud BEFORE first load (with a 4s timeout so we
     // never block longer than that). Then re-load if creds arrived.

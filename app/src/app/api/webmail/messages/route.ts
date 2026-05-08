@@ -199,12 +199,16 @@ export async function POST(request: NextRequest) {
       const rowIdCount = uids.length;
       const firstUid = uids[0] ?? "";
       const lastUid  = uids[uids.length - 1] ?? "";
+      // For small/empty responses, capture the body so the client can see what
+      // the server actually returned (redirect? "no more" message? error?).
+      const sampleHtml = html.length < 2000 ? html.replace(/\s+/g, " ").slice(0, 1000) : "";
       console.log(`[WEBMAIL] page=${pageParam} got=${msgs.length} rowIdCount=${rowIdCount} firstUid=${firstUid} lastUid=${lastUid} htmlLen=${html.length}`);
+      if (sampleHtml) console.log(`[WEBMAIL] page=${pageParam} short response sample: ${sampleHtml}`);
       return NextResponse.json({
         messages: msgs,
         hasMore: msgs.length > 0,
         sessionCookie: activeCookie,
-        _debug: { htmlLen: html.length, rowIdCount, firstUid, lastUid, mailbox, page: pageParam },
+        _debug: { htmlLen: html.length, rowIdCount, firstUid, lastUid, mailbox, page: pageParam, sampleHtml },
       });
     }
 
