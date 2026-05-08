@@ -2977,86 +2977,68 @@ export default function OutlookPage() {
             ) : (
               <>
                 <div className="shrink-0 border-b border-ink-100 px-3 md:px-5 py-2 md:py-3">
-                  {/* ── Mobile icon bar (single row) ─────────────────────── */}
-                  <div className="flex md:hidden items-center justify-between gap-1">
-                    <div className="flex items-center gap-0.5">
-                      {/* Back */}
-                      <button onClick={() => setMobileView("list")} title="목록"
-                        className="flex h-9 w-9 items-center justify-center rounded text-ink-500 hover:bg-ink-100 active:bg-ink-200">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      <div className="w-px h-5 bg-ink-200 mx-0.5"/>
-                      {/* Reply */}
-                      <button onClick={() => quickOutlookAction("reply")} title="회신" disabled={!selected}
-                        className="flex h-9 w-9 items-center justify-center rounded text-[#0078d4] hover:bg-[#deecf9] active:bg-[#c7e0f4] disabled:opacity-30 disabled:cursor-not-allowed">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 17l-5-5 5-5M4 12h11a5 5 0 010 10H11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      {/* Reply All */}
-                      <button onClick={() => quickOutlookAction("replyAll")} title="전체 회신" disabled={!selected}
-                        className="flex h-9 w-9 items-center justify-center rounded text-[#0078d4] hover:bg-[#deecf9] active:bg-[#c7e0f4] disabled:opacity-30 disabled:cursor-not-allowed">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M7 17l-5-5 5-5M2 12h11a5 5 0 010 10H9M13 17l-5-5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      {/* Forward */}
-                      <button onClick={() => quickOutlookAction("forward")} title="전달" disabled={!selected}
-                        className="flex h-9 w-9 items-center justify-center rounded text-[#107c10] hover:bg-[#e6f4e6] active:bg-[#cceacc] disabled:opacity-30 disabled:cursor-not-allowed">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 000 10h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      {/* Delete */}
-                      <button onClick={() => selected && deleteMessage(selected)} title="삭제" disabled={!selected}
-                        className="flex h-9 w-9 items-center justify-center rounded text-red-500 hover:bg-red-50 active:bg-red-100 disabled:opacity-30 disabled:cursor-not-allowed">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      {/* Open in Outlook */}
-                      <button onClick={() => openRecipientModal(false)} title="Outlook에서 열기" disabled={!draft}
-                        className="flex h-9 w-9 items-center justify-center rounded text-[#0f3460] hover:bg-[#e8eef7] active:bg-[#d0ddf0] disabled:opacity-30 disabled:cursor-not-allowed">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M9 17l-5-5 5-5M20 18v-2a4 4 0 00-4-4H4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      {/* Send now */}
-                      <button onClick={() => openRecipientModal(true)} title="바로 발송" disabled={!draft}
-                        className={`flex h-9 w-9 items-center justify-center rounded transition disabled:opacity-30 disabled:cursor-not-allowed ${draft ? "bg-[#0f3460] text-white hover:bg-[#0a2342]" : "text-ink-300"}`}>
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      <div className="w-px h-5 bg-ink-200 mx-0.5"/>
-                      {/* AI toggle */}
-                      <button onClick={() => setMobileView(v => v === "ai" ? "reading" : "ai")} title="AI Draft"
-                        className={`flex h-9 w-9 items-center justify-center rounded text-[11px] font-bold transition ${mobileView === "ai" ? "bg-[#0f3460] text-white" : "border border-ink-200 text-[#0f3460] hover:bg-[#0f3460] hover:text-white"}`}>
-                        AI
-                      </button>
-                    </div>
+                  {/* ── Mobile icon bar — single row ─────────────────────── */}
+                  <div className="flex md:hidden items-center gap-0.5">
+                    {/* Back to list */}
+                    <button onClick={() => setMobileView("list")} title="목록"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-ink-500 hover:bg-ink-100 active:bg-ink-200">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <div className="w-px h-4 bg-ink-200 mx-0.5 shrink-0"/>
+                    {/* Reply */}
+                    <button onClick={() => quickOutlookAction("reply")} title="회신" disabled={!selected}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-[#0078d4] hover:bg-[#deecf9] active:bg-[#c7e0f4] disabled:opacity-30">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 17l-5-5 5-5M4 12h11a5 5 0 010 10H11" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    {/* Reply All */}
+                    <button onClick={() => quickOutlookAction("replyAll")} title="전체 회신" disabled={!selected}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-[#0078d4] hover:bg-[#deecf9] active:bg-[#c7e0f4] disabled:opacity-30">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 17l-5-5 5-5M2 12h11a5 5 0 010 10H9M13 17l-5-5 5-5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    {/* Forward */}
+                    <button onClick={() => quickOutlookAction("forward")} title="전달" disabled={!selected}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-[#107c10] hover:bg-[#e6f4e6] active:bg-[#cceacc] disabled:opacity-30">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 000 10h2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    {/* Delete */}
+                    <button onClick={() => selected && deleteMessage(selected)} title="삭제" disabled={!selected}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-red-500 hover:bg-red-50 active:bg-red-100 disabled:opacity-30">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <div className="w-px h-4 bg-ink-200 mx-0.5 shrink-0"/>
+                    {/* Prev / count / Next — inline */}
+                    {(() => {
+                      const idx  = filtered.findIndex(m => m.entryId === selected.entryId);
+                      const prev = idx > 0 ? filtered[idx - 1] : null;
+                      const next = idx < filtered.length - 1 ? filtered[idx + 1] : null;
+                      return (
+                        <>
+                          <button onClick={() => prev && selectMessage(prev)} disabled={!prev}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-ink-500 hover:bg-ink-100 disabled:opacity-30">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </button>
+                          <span className="shrink-0 text-[11px] text-ink-400 tabular-nums">{idx + 1}/{filtered.length}</span>
+                          <button onClick={() => next && selectMessage(next)} disabled={!next}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-ink-500 hover:bg-ink-100 disabled:opacity-30">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </button>
+                        </>
+                      );
+                    })()}
+                    {/* spacer */}
+                    <div className="flex-1"/>
+                    {/* AI toggle */}
+                    <button onClick={() => setMobileView(v => v === "ai" ? "reading" : "ai")} title="AI Draft"
+                      className={`flex h-8 shrink-0 items-center justify-center rounded px-2 text-[11px] font-bold transition ${mobileView === "ai" ? "bg-[#0f3460] text-white" : "border border-ink-200 text-[#0f3460]"}`}>
+                      AI
+                    </button>
                   </div>
                   {replyStatus && (
                     <div className="md:hidden mt-1 text-[11px] font-medium text-center" style={{ color: replyStatus.startsWith("✓") ? "#16a34a" : replyStatus.includes("중") ? "#9ca3af" : "#dc2626" }}>
                       {replyStatus}
                     </div>
                   )}
-                  {/* Mobile prev/next + divider */}
-                  <div className="md:hidden flex items-center justify-between mt-2 mb-1">
-                    <div className="flex items-center gap-1">
-                      {(() => {
-                        const idx = filtered.findIndex(m => m.entryId === selected.entryId);
-                        const prev = idx > 0 ? filtered[idx - 1] : null;
-                        const next = idx < filtered.length - 1 ? filtered[idx + 1] : null;
-                        return (
-                          <>
-                            <button onClick={() => prev && selectMessage(prev)} disabled={!prev}
-                              className="flex h-7 items-center gap-1 rounded border border-ink-200 px-2 text-[11px] text-ink-600 hover:border-[#0078d4] hover:text-[#0078d4] disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap">
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              Prev
-                            </button>
-                            <span className="text-[10px] text-ink-400 px-1">{idx + 1}/{filtered.length}</span>
-                            <button onClick={() => next && selectMessage(next)} disabled={!next}
-                              className="flex h-7 items-center gap-1 rounded border border-ink-200 px-2 text-[11px] text-ink-600 hover:border-[#0078d4] hover:text-[#0078d4] disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap">
-                              Next
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            </button>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <hr className="md:hidden border-t border-ink-100 mb-2"/>
+                  <hr className="md:hidden border-t border-ink-100 mt-1 mb-2"/>
 
                   {/* ── Desktop text button bar ──────────────────────────── */}
                   <div className="hidden md:flex mb-2 flex-wrap items-center gap-2">
