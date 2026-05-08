@@ -752,35 +752,32 @@ export default function OutlookPage() {
       }
       cached.slice(1, 6).forEach(m => prefetchThread(m));
 
-      const age = Date.now() - (msgCacheTs.current.get(folder) ?? 0);
       const capturedFolder = folder;
 
-      if (mailProto === "webmail") {
-        const notFullyLoaded = !fullyLoadedRef.current.has(capturedFolder);
-        const notBgLoading   = !bgLoadingRef.current.has(capturedFolder);
-
-        if (age < CACHE_TTL_MS) {
-          // Fresh cache — start background load if not fully fetched yet (regardless of count)
-          if (notFullyLoaded && notBgLoading && cached.length > 0) {
-            startBackgroundPages(capturedFolder, Math.floor(cached.length / 200), getWebmailSession());
-          }
-          return;
-        }
-
-        // Stale cache: re-check page 0 for new messages, then load any missing pages
-        if (notBgLoading) {
-          startBackgroundPages(capturedFolder, 0, getWebmailSession());
-        }
-      } else {
-        if (age < CACHE_TTL_MS) return;
-        // Outlook COM stale background refresh
-        fetch(`/api/outlook/messages?${new URLSearchParams({ folder: capturedFolder, limit: "50" })}`)
-          .then(r => r.json())
-          .then((data: unknown) => {
-            if (!Array.isArray(data) || data.length === 0) return;
-            applyMerge(capturedFolder, data as OutlookMessage[], true);
-          })
-          .catch(() => {});
+      // Trigger IMAP background enhancement when available — replaces the old
+      // webmail-page-0 background call which competed with Step 1 / secondary
+      // folder prefetch and caused MAILNARA to return empty under concurrency.
+      if ((capturedFolder === "inbox" || capturedFolder === "sent")
+          && !bgLoadingRef.current.has(capturedFolder)) {
+        bgLoadingRef.current.add(capturedFolder);
+        (async () => {
+          try {
+            const imapMsgs = await tryImapFetch(2000);
+            if (Array.isArray(imapMsgs) && imapMsgs.length > 0) {
+              const cur = msgCache.current.get(capturedFolder) ?? [];
+              if (imapMsgs.length > cur.length) {
+                setFolderCache(capturedFolder, imapMsgs);
+                if (activeFolderRef.current === capturedFolder) {
+                  setMessages(imapMsgs);
+                  setLoadingCount(imapMsgs.length);
+                }
+                localStorage.setItem(PROTO_KEY, "imap");
+                fullyLoadedRef.current.add(capturedFolder);
+              }
+            }
+          } catch (e) { console.warn("[IMAP cache-serve enhance] failed:", e); }
+          finally { bgLoadingRef.current.delete(capturedFolder); }
+        })();
       }
       return;
     } else {
@@ -798,10 +795,19 @@ export default function OutlookPage() {
       let connError = "";
 
       // ── Step 1: Webmail first — guaranteed to return SOMETHING quickly ────
-      // We later try IMAP in parallel for a fuller list.
+      // MAILNARA returns an empty list under concurrent-request load. If we get
+      // 0 messages, retry up to 2 times (with brief delays) before giving up.
       try {
-        const session   = getWebmailSession();
-        const firstPage = await fetchWebmailPage(folder, 0, session);
+        let firstPage: WebmailPageResult | null = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const session = getWebmailSession();
+          firstPage = await fetchWebmailPage(folder, 0, session);
+          if (firstPage && firstPage.messages.length > 0) break;
+          if (attempt < 2) {
+            console.warn(`[loadMessages] webmail attempt ${attempt + 1} returned 0 — retrying`);
+            await new Promise(r => setTimeout(r, 800));
+          }
+        }
         if (firstPage !== null) {
           saveWebmailSession(firstPage.sessionCookie);
           data = firstPage.messages;
@@ -967,11 +973,17 @@ export default function OutlookPage() {
       ensureSettings(),
       new Promise<void>(resolve => setTimeout(resolve, 4000)),
     ]);
-    syncWithTimeout.then(() => {
+    // Mutex so the primary loadMessages call cannot overlap with anything
+    // else that might fire fetchWebmailPage(inbox, 0). MAILNARA returns
+    // empty under concurrent load, which would mask valid responses.
+    let inboxLoading = false;
+    syncWithTimeout.then(async () => {
+      if (inboxLoading) return;
+      inboxLoading = true;
       // After settings have settled, kick off the load. If creds were absent
       // before but present now, this is the load that actually finds them.
       migrateProtoIfNeeded();
-      loadMessages("inbox").then(() => {
+      loadMessages("inbox").finally(() => { inboxLoading = false; }).then(() => {
       // Prefetch other folders after inbox loads. IMAP route only supports INBOX,
       // so for sent/drafts/deleted/junk we always fall back to webmail.
       setTimeout(async () => {
