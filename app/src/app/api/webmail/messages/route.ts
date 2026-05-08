@@ -194,14 +194,17 @@ export async function POST(request: NextRequest) {
       }
 
       const msgs = parseMailList(html, mailbox);
-      const rowIdMatches = html.match(/id=["']row_id_\d+["']/g);
-      const rowIdCount = rowIdMatches ? rowIdMatches.length : 0;
-      console.log(`[WEBMAIL] single-page mode page=${pageParam} got=${msgs.length} rowIdCount=${rowIdCount} htmlLen=${html.length}`);
+      const rowIdMatches = html.match(/id=["']row_id_(\d+)["']/g) ?? [];
+      const uids = rowIdMatches.map(s => s.match(/\d+/)?.[0] ?? "").filter(Boolean);
+      const rowIdCount = uids.length;
+      const firstUid = uids[0] ?? "";
+      const lastUid  = uids[uids.length - 1] ?? "";
+      console.log(`[WEBMAIL] page=${pageParam} got=${msgs.length} rowIdCount=${rowIdCount} firstUid=${firstUid} lastUid=${lastUid} htmlLen=${html.length}`);
       return NextResponse.json({
         messages: msgs,
         hasMore: msgs.length > 0,
         sessionCookie: activeCookie,
-        _debug: { htmlLen: html.length, rowIdCount, mailbox, page: pageParam },
+        _debug: { htmlLen: html.length, rowIdCount, firstUid, lastUid, mailbox, page: pageParam },
       });
     }
 
