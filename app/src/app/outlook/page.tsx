@@ -750,85 +750,66 @@ export default function OutlookPage() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
+      let connError = "";
 
-      if (mailProto === "webmail") {
-        // Credentials known — skip Outlook COM round-trip, go directly to webmail
-        try {
-          const session   = getWebmailSession();
-          const firstPage = await fetchWebmailPage(folder, 0, session);
-          if (firstPage === null) throw new Error("웹메일 설정을 확인하세요 (host/user/pass)");
+      // ── Step 1: always try webmail first if credentials exist ─────────────
+      // Credentials are checked directly — no dependency on PROTO_KEY.
+      try {
+        const session   = getWebmailSession();
+        const firstPage = await fetchWebmailPage(folder, 0, session);
+        if (firstPage !== null) {
           saveWebmailSession(firstPage.sessionCookie);
           data = firstPage.messages;
+          localStorage.setItem(PROTO_KEY, "webmail");
           if (firstPage.hasMore) {
             startBackgroundPages(folder, 1, firstPage.sessionCookie);
           } else {
             fullyLoadedRef.current.add(folder);
           }
-        } catch (e) {
-          throw new Error(`${String(e)}\n\n설정 → POP3 서버 주소와 계정 정보를 확인하세요.`);
         }
-      } else {
+        // firstPage === null means no credentials — fall through silently
+      } catch (e) {
+        connError = String(e);
+      }
+
+      // ── Step 2: Outlook COM (Windows only) ───────────────────────────────
+      if (data === undefined) {
         const qs  = new URLSearchParams({ folder });
         const res = await fetch(`/api/outlook/messages?${qs}`);
-        data = await res.json();
+        const comData = await res.json();
 
-        if (res.status === 503 || data?.error) {
-          let mailMsgs: OutlookMessage[] | null = null;
-          let connError = "";
-
-          // 1) Webmail — try FIRST (unlimited pagination, all folders)
-          try {
-            const session   = getWebmailSession();
-            const firstPage = await fetchWebmailPage(folder, 0, session);
-            if (firstPage !== null) {
-              saveWebmailSession(firstPage.sessionCookie);
-              mailMsgs = firstPage.messages;
-              localStorage.setItem(PROTO_KEY, "webmail");
-              if (firstPage.hasMore) {
-                startBackgroundPages(folder, 1, firstPage.sessionCookie);
-              } else {
-                fullyLoadedRef.current.add(folder);
-              }
-            }
-          } catch (e) {
-            connError = String(e);
-          }
-
-          // 2) IMAP fallback (inbox/sent only — if no webmail credentials)
-          if (mailMsgs === null && (folder === "inbox" || folder === "sent")) {
-            const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-            if ("ok" in imapResult && imapResult.ok !== null) {
-              mailMsgs = imapResult.ok;
-              localStorage.setItem(PROTO_KEY, "imap");
-            } else if ("err" in imapResult) {
-              connError = connError ? `${connError}\n${imapResult.err}` : imapResult.err;
-            }
-          }
-
-          // 3) POP3 fallback (last resort)
-          if (mailMsgs === null) {
-            const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-            if ("ok" in pop3Result && pop3Result.ok !== null) {
-              mailMsgs = pop3Result.ok;
-              localStorage.setItem(PROTO_KEY, "pop3");
-            } else if ("err" in pop3Result) {
-              connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
-            }
-          }
-
-          if (mailMsgs !== null) {
-            data = mailMsgs;
-          } else if (connError) {
-            throw new Error(`${connError}\n\n설정 → IMAP/POP3 서버 주소와 계정 정보를 확인하세요.`);
-          } else {
-            throw new Error(
-              "Outlook을 사용할 수 없습니다.\n" +
-              "설정 → IMAP 또는 POP3 항목에 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다."
-            );
-          }
-        } else {
+        if (res.status !== 503 && !comData?.error) {
+          data = comData;
           localStorage.setItem(PROTO_KEY, "outlook");
         }
+      }
+
+      // ── Step 3: IMAP fallback ─────────────────────────────────────────────
+      if (data === undefined && (folder === "inbox" || folder === "sent")) {
+        const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+        if ("ok" in imapResult && imapResult.ok !== null) {
+          data = imapResult.ok;
+          localStorage.setItem(PROTO_KEY, "imap");
+        } else if ("err" in imapResult) {
+          connError = connError ? `${connError}\n${(imapResult as { err: string }).err}` : (imapResult as { err: string }).err;
+        }
+      }
+
+      // ── Step 4: POP3 fallback ─────────────────────────────────────────────
+      if (data === undefined) {
+        const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+        if ("ok" in pop3Result && pop3Result.ok !== null) {
+          data = pop3Result.ok;
+          localStorage.setItem(PROTO_KEY, "pop3");
+        } else if ("err" in pop3Result) {
+          connError = connError ? `${connError}\n${(pop3Result as { err: string }).err}` : (pop3Result as { err: string }).err;
+        }
+      }
+
+      if (data === undefined) {
+        throw new Error(connError ||
+          "메일을 불러올 수 없습니다.\n설정 → IMAP 또는 POP3 항목에 서버 주소와 계정 정보를 입력하세요."
+        );
       }
 
       const msgs: OutlookMessage[] = Array.isArray(data) ? data : [];
