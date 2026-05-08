@@ -151,67 +151,93 @@ function parseSize(s: string): number {
   return Math.round(n);
 }
 
-// MAILNARA 4.x exposes attachments via mail_view (or similar). Parse links.
+// MAILNARA exposes attachments via the wrapping mail_view page. The /new_mua/
+// prefix appears in the logout redirect, so this install uses both prefixes.
 async function fetchAttachmentList(
   host: string,
   cookie: string,
   uid: string,
   mailbox: string,
-): Promise<AttachmentMeta[]> {
+): Promise<{ list: AttachmentMeta[]; sample: string; hitUrl: string }> {
   const candidates = [
+    `https://${host}/new_mua/index.php/mail/mail_view/${mailbox}/${uid}`,
+    `https://${host}/new_mua/index.php/mail/mail_content/${mailbox}/${uid}`,
     `https://${host}/new_mailnara_web/index.php/mail/mail_view/${mailbox}/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/maildecode/mail_content_body/${mailbox}/${uid}/Y/Y`,
     `https://${host}/new_mailnara_web/index.php/mail/mail_view_v3/${mailbox}/${uid}`,
     `https://${host}/new_mailnara_web/index.php/maildecode/mail_attach_list/${mailbox}/${uid}`,
   ];
+
+  let bestSample = "";
+  let bestUrl = "";
   for (const url of candidates) {
     try {
       const resp = await fetch(url, { headers: { Cookie: cookie } });
       console.log(`[WEBMAIL-THREAD] attach probe ${url} → status=${resp.status}`);
       if (!resp.ok) continue;
       const html = await resp.text();
-      const list: AttachmentMeta[] = [];
-
-      // Pattern A: any anchor whose href points at a download-ish endpoint
-      const downloadPattern = /<a\b[^>]*?href=["']([^"']*?(?:download|attach|maildownload|mail_attach|attachment)[^"']*?)["'][^>]*>([\s\S]*?)<\/a>/gi;
-      let m: RegExpExecArray | null;
-      while ((m = downloadPattern.exec(html)) !== null) {
-        const inner = m[2].replace(/<[^>]+>/g, "").trim();
-        if (!inner || inner.length > 200) continue;
-        const cleaned = inner.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
-        if (/^\s*(다운로드|download|첨부|view|보기|미리보기|preview)\s*$/i.test(cleaned)) continue;
-        const sm = cleaned.match(/^(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]\s*$/i);
-        const name = tryDecodeURI(sm ? sm[1].trim() : cleaned);
-        const size = sm ? parseSize(sm[2]) : 0;
-        list.push({ name, size });
+      console.log(`[WEBMAIL-THREAD] ${url} htmlLen=${html.length}`);
+      const list = parseAttachmentsFromHtml(html);
+      if (list.length > 0) {
+        console.log(`[WEBMAIL-THREAD] ✓ found ${list.length} attachment(s) at ${url}`);
+        return { list, sample: "", hitUrl: url };
       }
-
-      // Pattern B: MAILNARA's attachment row markup — `class="attach_*"`, `class="m-file"`, etc.
-      const attachRowPattern = /<(?:li|tr|div)\b[^>]*class=["'][^"']*(?:m-file|attach|file_list|file_row)[^"']*["'][^>]*>([\s\S]*?)<\/(?:li|tr|div)>/gi;
-      while ((m = attachRowPattern.exec(html)) !== null) {
-        const inner = m[1];
-        const txt = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-        if (!txt || txt.length > 300) continue;
-        const sm = txt.match(/(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]/i);
-        if (sm) {
-          list.push({ name: tryDecodeURI(sm[1].trim()), size: parseSize(sm[2]) });
-        }
+      // Track the page that contained "첨부" or file-extension hints so we can
+      // ship a sample to the client for debugging
+      if (!bestSample && (/첨부/.test(html) || /\.(pdf|xlsx?|docx?|hwp|zip|jpg|png|gif|pptx?)\b/i.test(html))) {
+        bestSample = html.slice(0, 4000).replace(/\s+/g, " ");
+        bestUrl = url;
       }
-
-      // Dedupe by name
-      const seen = new Set<string>();
-      const deduped = list.filter(a => {
-        if (seen.has(a.name)) return false;
-        seen.add(a.name);
-        return true;
-      });
-
-      console.log(`[WEBMAIL-THREAD] ${url} → htmlLen=${html.length} parsed=${deduped.length}`);
-      if (deduped.length > 0) return deduped;
     } catch (e) {
       console.warn(`[WEBMAIL-THREAD] attach url failed ${url}:`, String(e));
     }
   }
-  return [];
+  if (bestSample) console.log(`[WEBMAIL-THREAD] no parser hit. Best candidate ${bestUrl}: ${bestSample.slice(0, 1500)}`);
+  return { list: [], sample: bestSample, hitUrl: bestUrl };
+}
+
+// Permissive parser — try many patterns, return ALL distinct file-like links
+function parseAttachmentsFromHtml(html: string): AttachmentMeta[] {
+  const list: AttachmentMeta[] = [];
+
+  // Pattern 1: anchors with download-ish hrefs
+  const linkPattern = /<a\b[^>]*?href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = linkPattern.exec(html)) !== null) {
+    const href = m[1];
+    const inner = m[2].replace(/<[^>]+>/g, "").trim().replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+    if (!inner || inner.length > 200) continue;
+    if (/^\s*(다운로드|download|첨부|view|보기|미리보기|preview|reply|회신|이전|다음)\s*$/i.test(inner)) continue;
+
+    // accept if href points at download endpoint OR if the link text has a file extension
+    const hrefLooksLikeDownload = /(?:download|attach|maildownload|mail_attach|attachment|file_down)/i.test(href);
+    const textHasExtension = /\.(pdf|xlsx?|docx?|hwp|zip|jpg|jpeg|png|gif|pptx?|txt|csv|rar|7z|mp[34]|wav|avi|mov|psd|ai|dwg|step|stp|iges?|igs)\b/i.test(inner);
+    if (!hrefLooksLikeDownload && !textHasExtension) continue;
+
+    const sm = inner.match(/^(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]\s*$/i);
+    const name = tryDecodeURI(sm ? sm[1].trim() : inner);
+    const size = sm ? parseSize(sm[2]) : 0;
+    list.push({ name, size });
+  }
+
+  // Pattern 2: MAILNARA attachment row containers
+  const rowPattern = /<(?:li|tr|div|span)\b[^>]*class=["'][^"']*(?:m-file|attach|file_list|file_row|file_name|attachfile)[^"']*["'][^>]*>([\s\S]*?)<\/(?:li|tr|div|span)>/gi;
+  while ((m = rowPattern.exec(html)) !== null) {
+    const inner = m[1];
+    const txt = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (!txt || txt.length > 300) continue;
+    const sm = txt.match(/(.+?\.[a-z0-9]{1,5})\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]/i);
+    if (sm) list.push({ name: tryDecodeURI(sm[1].trim()), size: parseSize(sm[2]) });
+  }
+
+  // Dedupe by name
+  const seen = new Set<string>();
+  return list.filter(a => {
+    const k = a.name.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 async function fetchBody(
@@ -219,7 +245,7 @@ async function fetchBody(
   cookie: string,
   uid: string,
   mailbox = "Inbox",
-): Promise<{ htmlBody: string; body: string; attachments: AttachmentMeta[] }> {
+): Promise<{ htmlBody: string; body: string; attachments: AttachmentMeta[]; attachDebug?: { sample: string; hitUrl: string } }> {
   // MAILNARA 4.x: body is in an iframe at maildecode/mail_content_body
   const bodyUrl = `https://${host}/new_mailnara_web/index.php/maildecode/mail_content_body/${mailbox}/${uid}/N/N`;
   console.log(`[WEBMAIL-THREAD] fetching body url: ${bodyUrl}`);
@@ -230,12 +256,25 @@ async function fetchBody(
   const baseHref = `https://${host}/`;
   // Inline relative images as data URIs so they load without the session cookie
   const inlinedHtml = await inlineImages(html, host, cookie);
-  // Fetch attachment list in parallel (best effort)
-  const attachments = await fetchAttachmentList(host, cookie, uid, mailbox).catch(() => [] as AttachmentMeta[]);
+
+  // Try external mail_view URLs first
+  let { list: attachments, sample, hitUrl } = await fetchAttachmentList(host, cookie, uid, mailbox)
+    .catch(() => ({ list: [] as AttachmentMeta[], sample: "", hitUrl: "" }));
+
+  // Fallback: parse attachments out of the body HTML itself
+  if (attachments.length === 0) {
+    const fromBody = parseAttachmentsFromHtml(html);
+    if (fromBody.length > 0) {
+      console.log(`[WEBMAIL-THREAD] parsed ${fromBody.length} attachment(s) from body iframe`);
+      attachments = fromBody;
+    }
+  }
+
   return {
     htmlBody: injectFont(inlinedHtml, baseHref),
     body: stripTags(html).slice(0, 2000),
     attachments,
+    attachDebug: attachments.length === 0 && sample ? { sample, hitUrl } : undefined,
   };
 }
 
@@ -260,7 +299,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const cookie = sessionCookie || await mailnaraLogin(host, user, pass);
-    const { htmlBody, body: plainBody, attachments } = await fetchBody(host, cookie, uid, mailbox);
+    const { htmlBody, body: plainBody, attachments, attachDebug } = await fetchBody(host, cookie, uid, mailbox);
 
     const thread = [{
       entryId:     `web-${uid}`,
@@ -272,9 +311,10 @@ export async function POST(request: NextRequest) {
       htmlBody,
       attachments,
       recipients:  [],
+      _attachDebug: attachDebug,
     }];
 
-    console.log(`[WEBMAIL-THREAD] done. htmlBody length=${htmlBody.length}`);
+    console.log(`[WEBMAIL-THREAD] done. htmlBody length=${htmlBody.length} attachments=${attachments.length}`);
     return NextResponse.json(thread);
   } catch (e: unknown) {
     const msg = String(e).replace(/^Error:\s*/gi, "");

@@ -1125,6 +1125,12 @@ export default function OutlookPage() {
         const data = await res.json();
         if (data?.error) throw new Error(data.error);
         fetchedMsgs = Array.isArray(data) ? data : [];
+        // Surface attachment-parser debug info so we can fix the parser pattern
+        const dbg = Array.isArray(data) && data[0]?._attachDebug;
+        if (dbg) {
+          console.warn(`[ATTACH DEBUG] no attachments parsed. tried=${dbg.hitUrl}. sample HTML follows:`);
+          console.warn(dbg.sample);
+        }
       } else {
         const params = new URLSearchParams({ convId: msg.conversationId, entryId: msg.entryId });
         const res  = await fetch(`/api/outlook/thread?${params}`);
