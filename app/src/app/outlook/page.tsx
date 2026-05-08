@@ -714,11 +714,9 @@ export default function OutlookPage() {
         const notBgLoading   = !bgLoadingRef.current.has(capturedFolder);
 
         if (age < CACHE_TTL_MS) {
-          // Fresh cache — but may be incomplete (e.g. loaded from localStorage with only page 0)
-          // If cache size is a multiple of PAGE_SIZE, there might be more pages
-          const nextPage = cached.length / 200;
-          if (notFullyLoaded && notBgLoading && cached.length > 0 && cached.length % 200 === 0) {
-            startBackgroundPages(capturedFolder, nextPage, getWebmailSession());
+          // Fresh cache — start background load if not fully fetched yet (regardless of count)
+          if (notFullyLoaded && notBgLoading && cached.length > 0) {
+            startBackgroundPages(capturedFolder, Math.floor(cached.length / 200), getWebmailSession());
           }
           return;
         }
@@ -749,65 +747,87 @@ export default function OutlookPage() {
     // ── Full load ─────────────────────────────────────────────────────────────
     setMsgLoading(true);
     try {
-      const qs  = new URLSearchParams({ folder });
-      const res = await fetch(`/api/outlook/messages?${qs}`);
-      let data  = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let data: any;
 
-      if (res.status === 503 || data?.error) {
-        let mailMsgs: OutlookMessage[] | null = null;
-        let connError = "";
-
-        // 1) Webmail — try FIRST (unlimited pagination, all folders, uses popHost/popUser/popPass)
+      if (mailProto === "webmail") {
+        // Credentials known — skip Outlook COM round-trip, go directly to webmail
         try {
           const session   = getWebmailSession();
           const firstPage = await fetchWebmailPage(folder, 0, session);
-          if (firstPage !== null) {
-            saveWebmailSession(firstPage.sessionCookie);
-            mailMsgs = firstPage.messages;
-            connError = "";
-            localStorage.setItem(PROTO_KEY, "webmail");
-            if (firstPage.hasMore) {
-              startBackgroundPages(folder, 1, firstPage.sessionCookie);
-            }
+          if (firstPage === null) throw new Error("웹메일 설정을 확인하세요 (host/user/pass)");
+          saveWebmailSession(firstPage.sessionCookie);
+          data = firstPage.messages;
+          if (firstPage.hasMore) {
+            startBackgroundPages(folder, 1, firstPage.sessionCookie);
+          } else {
+            fullyLoadedRef.current.add(folder);
           }
         } catch (e) {
-          connError = String(e);
-        }
-
-        // 2) IMAP fallback (inbox/sent only — if no webmail credentials)
-        if (mailMsgs === null && (folder === "inbox" || folder === "sent")) {
-          const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-          if ("ok" in imapResult && imapResult.ok !== null) {
-            mailMsgs = imapResult.ok;
-            localStorage.setItem(PROTO_KEY, "imap");
-          } else if ("err" in imapResult) {
-            connError = connError ? `${connError}\n${imapResult.err}` : imapResult.err;
-          }
-        }
-
-        // 3) POP3 fallback (last resort)
-        if (mailMsgs === null) {
-          const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-          if ("ok" in pop3Result && pop3Result.ok !== null) {
-            mailMsgs = pop3Result.ok;
-            localStorage.setItem(PROTO_KEY, "pop3");
-          } else if ("err" in pop3Result) {
-            connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
-          }
-        }
-
-        if (mailMsgs !== null) {
-          data = mailMsgs;
-        } else if (connError) {
-          throw new Error(`${connError}\n\n설정 → IMAP/POP3 서버 주소와 계정 정보를 확인하세요.`);
-        } else {
-          throw new Error(
-            "Outlook을 사용할 수 없습니다.\n" +
-            "설정 → IMAP 또는 POP3 항목에 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다."
-          );
+          throw new Error(`${String(e)}\n\n설정 → POP3 서버 주소와 계정 정보를 확인하세요.`);
         }
       } else {
-        localStorage.setItem(PROTO_KEY, "outlook");
+        const qs  = new URLSearchParams({ folder });
+        const res = await fetch(`/api/outlook/messages?${qs}`);
+        data = await res.json();
+
+        if (res.status === 503 || data?.error) {
+          let mailMsgs: OutlookMessage[] | null = null;
+          let connError = "";
+
+          // 1) Webmail — try FIRST (unlimited pagination, all folders)
+          try {
+            const session   = getWebmailSession();
+            const firstPage = await fetchWebmailPage(folder, 0, session);
+            if (firstPage !== null) {
+              saveWebmailSession(firstPage.sessionCookie);
+              mailMsgs = firstPage.messages;
+              localStorage.setItem(PROTO_KEY, "webmail");
+              if (firstPage.hasMore) {
+                startBackgroundPages(folder, 1, firstPage.sessionCookie);
+              } else {
+                fullyLoadedRef.current.add(folder);
+              }
+            }
+          } catch (e) {
+            connError = String(e);
+          }
+
+          // 2) IMAP fallback (inbox/sent only — if no webmail credentials)
+          if (mailMsgs === null && (folder === "inbox" || folder === "sent")) {
+            const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+            if ("ok" in imapResult && imapResult.ok !== null) {
+              mailMsgs = imapResult.ok;
+              localStorage.setItem(PROTO_KEY, "imap");
+            } else if ("err" in imapResult) {
+              connError = connError ? `${connError}\n${imapResult.err}` : imapResult.err;
+            }
+          }
+
+          // 3) POP3 fallback (last resort)
+          if (mailMsgs === null) {
+            const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+            if ("ok" in pop3Result && pop3Result.ok !== null) {
+              mailMsgs = pop3Result.ok;
+              localStorage.setItem(PROTO_KEY, "pop3");
+            } else if ("err" in pop3Result) {
+              connError = connError ? `${connError}\n${pop3Result.err}` : pop3Result.err;
+            }
+          }
+
+          if (mailMsgs !== null) {
+            data = mailMsgs;
+          } else if (connError) {
+            throw new Error(`${connError}\n\n설정 → IMAP/POP3 서버 주소와 계정 정보를 확인하세요.`);
+          } else {
+            throw new Error(
+              "Outlook을 사용할 수 없습니다.\n" +
+              "설정 → IMAP 또는 POP3 항목에 서버 주소와 계정 정보를 입력하면 메일을 불러올 수 있습니다."
+            );
+          }
+        } else {
+          localStorage.setItem(PROTO_KEY, "outlook");
+        }
       }
 
       const msgs: OutlookMessage[] = Array.isArray(data) ? data : [];
@@ -844,8 +864,8 @@ export default function OutlookPage() {
         .catch(() => {});
     }
 
-    // If webmail credentials exist but PROTO_KEY is stale (imap/pop3), clear old cache
-    // so loadMessages doesn't hit the 20-email IMAP cache and return early.
+    // If webmail credentials exist, ensure PROTO_KEY is "webmail" and clear any stale
+    // IMAP/POP3 cache (entryIds without "web-" prefix) so a fresh webmail load runs.
     try {
       const raw = localStorage.getItem("ae_settings_v1");
       if (raw) {
@@ -853,13 +873,18 @@ export default function OutlookPage() {
         const popHost = String(cfg.popHost ?? "");
         const popUser = String(cfg.popUser ?? "");
         const popPass = String(cfg.popPass ?? "");
-        const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
-        if (popHost && popUser && popPass && currentProto !== "webmail") {
-          localStorage.setItem(PROTO_KEY, "webmail");
-          sessionStorage.removeItem(CACHE_KEY);
-          localStorage.removeItem(LS_CACHE_KEY);
-          msgCache.current.clear();
-          msgCacheTs.current.clear();
+        if (popHost && popUser && popPass) {
+          const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
+          // Check if cached inbox messages look like non-webmail (no "web-" prefix)
+          const cachedInbox  = msgCache.current.get("inbox") ?? [];
+          const isStaleCache = cachedInbox.length > 0 && !cachedInbox[0].entryId.startsWith("web-");
+          if (currentProto !== "webmail" || isStaleCache) {
+            localStorage.setItem(PROTO_KEY, "webmail");
+            sessionStorage.removeItem(CACHE_KEY);
+            localStorage.removeItem(LS_CACHE_KEY);
+            msgCache.current.clear();
+            msgCacheTs.current.clear();
+          }
         }
       }
     } catch {}
