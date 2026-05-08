@@ -932,9 +932,12 @@ export default function OutlookPage() {
       } catch {}
     }
 
-    ensureSettings().then(() => {
-      migrateProtoIfNeeded();
-      loadMessages("inbox").then(() => {
+    // Run settings sync in background — never block mail load.
+    // If creds arrive after the first load attempt, the next refresh will pick them up.
+    ensureSettings().catch(() => {});
+
+    migrateProtoIfNeeded();
+    loadMessages("inbox").then(() => {
       // Prefetch other folders after inbox loads. IMAP route only supports INBOX,
       // so for sent/drafts/deleted/junk we always fall back to webmail.
       setTimeout(async () => {
@@ -962,7 +965,6 @@ export default function OutlookPage() {
           }
         }
       }, 1500);
-      });
     });
   }, []); // eslint-disable-line
 
