@@ -32,23 +32,41 @@ export async function POST(request: NextRequest) {
   }
 
   let lastError = "";
+  // Retry each host up to MAX_ATTEMPTS times — Vercel cold starts and the
+  // Vercel→Korea network path are flaky enough that the first attempt often
+  // times out even when the credentials and server are valid.
+  const MAX_ATTEMPTS = 3;
   for (const tryHost of hostVariants) {
-    console.log(`[IMAP] connecting → ${tryHost}:${port} secure=${secure} user=${user}`);
-    const client = new ImapFlow({
-      host: tryHost,
-      port,
-      secure,
-      auth: { user, pass },
-      logger: false,
-      tls: { rejectUnauthorized: false },
-      connectionTimeout: 25_000,
-      greetingTimeout: 25_000,
-      socketTimeout: 50_000,
-    });
+    let connected = false;
+    let client: ImapFlow | null = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS && !connected; attempt++) {
+      console.log(`[IMAP] connecting → ${tryHost}:${port} secure=${secure} user=${user} (attempt ${attempt}/${MAX_ATTEMPTS})`);
+      client = new ImapFlow({
+        host: tryHost,
+        port,
+        secure,
+        auth: { user, pass },
+        logger: false,
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 25_000,
+        greetingTimeout: 25_000,
+        socketTimeout: 50_000,
+      });
+      try {
+        await client.connect();
+        connected = true;
+        console.log(`[IMAP] connected to ${tryHost} on attempt ${attempt}`);
+      } catch (e) {
+        lastError = String(e);
+        console.warn(`[IMAP] ${tryHost} attempt ${attempt} failed: ${lastError}`);
+        try { await client.logout(); } catch {}
+        client = null;
+        if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+    if (!connected || !client) continue;
 
     try {
-      await client.connect();
-      console.log(`[IMAP] connected to ${tryHost}`);
 
       const messages: unknown[] = [];
       const mailbox = await client.mailboxOpen("INBOX");

@@ -102,19 +102,36 @@ export async function POST(request: NextRequest) {
 
   console.log(`[POP3] connecting → ${host}:${port} ssl=${ssl} user=${user}`);
 
+  // Retry connection up to 3x — Vercel→Korea path is flaky.
+  const MAX_ATTEMPTS = 3;
   let session: Pop3Session | null = null;
+  let connectErr: unknown = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const sock = await tcpConnect(host, port, ssl);
+      session = new Pop3Session(sock);
+      const greeting = await session.readLine();
+      if (!greeting.startsWith("+OK")) throw new Error(`POP3 인사 실패: ${greeting}`);
+      const userResp = await session.cmd(`USER ${user}`);
+      if (!userResp.startsWith("+OK")) throw new Error(`USER 실패: ${userResp}`);
+      const passResp = await session.cmd(`PASS ${pass}`);
+      if (!passResp.startsWith("+OK")) throw new Error(`인증 실패: ${passResp}`);
+      console.log(`[POP3] connected on attempt ${attempt}`);
+      connectErr = null;
+      break;
+    } catch (e) {
+      connectErr = e;
+      console.warn(`[POP3] attempt ${attempt}/${MAX_ATTEMPTS} failed: ${String(e)}`);
+      try { (session as { sock?: { destroy?: () => void } } | null)?.sock?.destroy?.(); } catch {}
+      session = null;
+      if (attempt < MAX_ATTEMPTS) await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+  if (connectErr || !session) {
+    return NextResponse.json({ error: `POP3 연결 실패 (${MAX_ATTEMPTS}회 시도): ${String(connectErr)}` }, { status: 500 });
+  }
+
   try {
-    const sock = await tcpConnect(host, port, ssl);
-    session = new Pop3Session(sock);
-
-    const greeting = await session.readLine();
-    if (!greeting.startsWith("+OK")) throw new Error(`POP3 인사 실패: ${greeting}`);
-
-    const userResp = await session.cmd(`USER ${user}`);
-    if (!userResp.startsWith("+OK")) throw new Error(`USER 실패: ${userResp}`);
-
-    const passResp = await session.cmd(`PASS ${pass}`);
-    if (!passResp.startsWith("+OK")) throw new Error(`인증 실패: ${passResp}`);
 
     const statResp = await session.cmd("STAT");
     if (!statResp.startsWith("+OK")) throw new Error(`STAT 실패: ${statResp}`);
