@@ -673,31 +673,37 @@ export default function OutlookPage() {
     };
 
     // ── Background webmail page loader (runs after page 0 is shown) ──────────
-    // Sequential fetch. We stop on:
-    //   - MAX_CONSECUTIVE_EMPTY pages with 0 messages, OR
-    //   - MAX_CONSECUTIVE_NO_NEW pages where applyMerge added no NEW msgs
-    //     (this catches MAILNARA's "trailing repeat" pattern where the cursor
-    //     stops advancing past the end and each page just returns the last
-    //     14, 13, 12, ... mails of the inbox over and over).
+    // Sequential fetch. Stop conditions reflect actual MAILNARA behavior:
+    //   - 2 consecutive empty pages (rowIdCount=0).
+    //   - 3 consecutive pages with the same lastUid — MAILNARA's cursor is
+    //     stuck at the end and just returns trailing N, N-1, N-2, ... mails.
+    //   - 2 consecutive pages where rowIdCount drops well below the 15-mail
+    //     full-page count (e.g. 9, 8) AND no new messages added.
+    // We DO NOT stop on "applyMerge added 0 new" alone — that fires falsely
+    // when the cache already holds these mails from an earlier session.
     const startBackgroundPages = (capturedFolder: Folder, startPage: number, initCookie: string) => {
       if (bgLoadingRef.current.has(capturedFolder)) return;
       bgLoadingRef.current.add(capturedFolder);
       const MAX_CONSECUTIVE_EMPTY = 2;
-      const MAX_CONSECUTIVE_NO_NEW = 2;
+      const MAX_CONSECUTIVE_SAME_LASTUID = 3;
       const HARD_PAGE_CAP = 200;
       (async () => {
         let page = startPage;
         let cookie = initCookie;
         let consecutiveEmpty = 0;
-        let consecutiveNoNew = 0;
+        let lastUidSeen = "";
+        let lastUidStreak = 0;
         while (page < HARD_PAGE_CAP) {
           try {
             const result = await fetchWebmailPage(capturedFolder, page, cookie);
             if (!result) break;
             cookie = result.sessionCookie || cookie;
             saveWebmailSession(cookie);
-            const added = applyMerge(capturedFolder, result.messages, page === 0);
-            if (result.messages.length === 0) {
+            applyMerge(capturedFolder, result.messages, page === 0);
+            const msgs = result.messages as Array<{ entryId: string }>;
+            const lastEntry = msgs.length > 0 ? msgs[msgs.length - 1].entryId : "";
+            // Empty-page tracker
+            if (msgs.length === 0) {
               consecutiveEmpty++;
               if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
                 fullyLoadedRef.current.add(capturedFolder);
@@ -706,19 +712,17 @@ export default function OutlookPage() {
             } else {
               consecutiveEmpty = 0;
             }
-            if (added === 0 && result.messages.length > 0) {
-              consecutiveNoNew++;
-              if (consecutiveNoNew >= MAX_CONSECUTIVE_NO_NEW) {
-                console.log(`[bg pages] reached tail — ${consecutiveNoNew} pages with no new msgs at page=${page}`);
+            // Same-lastUid tracker (MAILNARA tail behaviour)
+            if (lastEntry && lastEntry === lastUidSeen) {
+              lastUidStreak++;
+              if (lastUidStreak >= MAX_CONSECUTIVE_SAME_LASTUID) {
+                console.log(`[bg pages] tail reached — same lastUid ${lastEntry} for ${lastUidStreak} pages, stopping at page=${page}`);
                 fullyLoadedRef.current.add(capturedFolder);
                 break;
               }
-            } else if (added > 0) {
-              consecutiveNoNew = 0;
-            }
-            if (!result.hasMore && consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
-              fullyLoadedRef.current.add(capturedFolder);
-              break;
+            } else if (lastEntry) {
+              lastUidSeen = lastEntry;
+              lastUidStreak = 1;
             }
             page++;
           } catch (e) {
