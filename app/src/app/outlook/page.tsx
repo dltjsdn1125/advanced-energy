@@ -1431,10 +1431,17 @@ export default function OutlookPage() {
   async function executeReply(to: RecipAddr[], cc: RecipAddr[], send: boolean) {
     const label = replyAction === "forward" ? "전달" : replyAction === "replyAll" ? "전체 회신" : "회신";
     if (!send) {
-      // "Open window without sending" no longer applies — Outlook desktop is
-      // unavailable on Vercel. Just keep the draft in the compose pane.
-      setReplyStatus(`✓ 작성 패널에 유지됨 (Send 클릭 시 발송)`);
-      setTimeout(() => setReplyStatus(""), 4000);
+      // Outlook desktop is unavailable on Vercel. Instead of failing silently,
+      // open the inline compose dialog pre-filled with the AI draft + recipients
+      // so the user can review/edit and click Send.
+      setComposeMode("reply");
+      setComposeToStr(to.map(a => a.email).join("; "));
+      setComposeCcStr(cc.map(a => a.email).join("; "));
+      setComposeBody(draft);
+      setComposeAiOpen(false);
+      setComposeQuoteH(200);
+      setReplyStatus("");
+      setComposeOpen(true);
       return;
     }
     setReplyStatus(`${label} 발송 중…`);
@@ -3478,7 +3485,7 @@ export default function OutlookPage() {
                     <button onClick={() => openRecipientModal(false)} disabled={!draft}
                       className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${draft ? "border-[#0f3460] bg-white text-[#0f3460] hover:bg-[#0f3460] hover:text-white" : "border-ink-200 text-ink-400 cursor-not-allowed"}`}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M9 17l-5-5 5-5M20 18v-2a4 4 0 00-4-4H4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      Open in Outlook
+                      편집 후 발송
                     </button>
                     <button onClick={() => openRecipientModal(true)} disabled={!draft}
                       className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-[12px] font-medium transition whitespace-nowrap ${draft ? "border-[#0f3460] bg-[#0f3460] text-white hover:bg-[#0a2342]" : "border-ink-200 bg-ink-100 text-ink-400 cursor-not-allowed"}`}>
@@ -3836,7 +3843,7 @@ export default function OutlookPage() {
                     <div className="flex gap-2">
                       <button onClick={() => executeReply(aiTo, aiCc, false)}
                         className="flex-1 rounded border border-[#0f3460] py-2 text-[12px] font-semibold text-[#0f3460] hover:bg-[#0f3460] hover:text-white transition">
-                        Outlook에서 열기
+                        편집 후 발송
                       </button>
                       <button onClick={() => executeReply(aiTo, aiCc, true)}
                         className="flex-1 rounded bg-[#0f3460] py-2 text-[12px] font-semibold text-white hover:bg-[#0a2342] transition">
