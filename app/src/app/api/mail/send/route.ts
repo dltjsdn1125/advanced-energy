@@ -2,44 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const {
-    email,
-    password,
-    smtpHost = "smtp.office365.com",
-    smtpPort = 587,
-    to,
-    subject,
-    htmlBody,
-    inReplyTo,
-    references,
-  } = body as Record<string, string | number>;
+  const body = await request.json() as Record<string, string | number | boolean>;
+  const smtpHost = String(body.smtpHost ?? "");
+  const smtpPort = Number(body.smtpPort) || 587;
+  const ssl      = body.ssl !== false && body.ssl !== "false";
+  const user     = String(body.user ?? body.email ?? "");
+  const pass     = String(body.pass ?? body.password ?? "");
+  const to       = String(body.to ?? "");
+  const cc       = String(body.cc ?? "");
+  const subject  = String(body.subject ?? "");
+  const htmlBody = String(body.htmlBody ?? "");
 
-  if (!email || !password || !to || !subject) {
-    return NextResponse.json({ error: "필수 파라미터 누락" }, { status: 400 });
+  if (!smtpHost || !user || !pass || !to || !subject) {
+    return NextResponse.json(
+      { error: "필수 파라미터 누락 (smtpHost, user, pass, to, subject)" },
+      { status: 400 }
+    );
   }
 
-  const port = Number(smtpPort);
   const transporter = nodemailer.createTransport({
-    host: String(smtpHost),
-    port,
-    secure: port === 465,
-    requireTLS: port === 587,
-    auth: { user: String(email), pass: String(password) },
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    requireTLS: ssl && smtpPort !== 465,
+    auth: { user, pass },
     tls: { rejectUnauthorized: false },
   });
 
   try {
-    const subjectStr = String(subject);
     await transporter.sendMail({
-      from: String(email),
-      to: String(to),
-      subject: /^re\s*:/i.test(subjectStr) ? subjectStr : `Re: ${subjectStr}`,
-      html: String(htmlBody ?? ""),
-      ...(inReplyTo ? { inReplyTo: String(inReplyTo) } : {}),
-      ...(references ? { references: String(references) } : {}),
+      from: user,
+      to,
+      ...(cc ? { cc } : {}),
+      subject,
+      html: htmlBody,
     });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

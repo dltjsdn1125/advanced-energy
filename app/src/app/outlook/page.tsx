@@ -477,6 +477,8 @@ export default function OutlookPage() {
 
   // Inline compose
   const [composeOpen,    setComposeOpen]    = useState(false);
+  const [composeMode,    setComposeMode]    = useState<"reply" | "new">("reply");
+  const [composeSubject, setComposeSubject] = useState("");
   const [composeToStr,   setComposeToStr]   = useState("");
   const [composeCcStr,   setComposeCcStr]   = useState("");
   const [composeBody,    setComposeBody]    = useState("");
@@ -752,52 +754,54 @@ export default function OutlookPage() {
       let data: any;
       let connError = "";
 
-      // ── Step 1: always try webmail first if credentials exist ─────────────
-      // Credentials are checked directly — no dependency on PROTO_KEY.
-      try {
-        const session   = getWebmailSession();
-        const firstPage = await fetchWebmailPage(folder, 0, session);
-        if (firstPage !== null) {
-          saveWebmailSession(firstPage.sessionCookie);
-          data = firstPage.messages;
-          localStorage.setItem(PROTO_KEY, "webmail");
-          if (firstPage.hasMore) {
-            startBackgroundPages(folder, 1, firstPage.sessionCookie);
-          } else {
-            fullyLoadedRef.current.add(folder);
-          }
+      // ── Step 1: IMAP first (reliable pagination, fetches all messages) ────
+      // IMAP supports proper pagination via UID range — webmail returns only ~14
+      // per page on this MAILNARA instance regardless of requested size, so IMAP
+      // is the only protocol that can reliably load all ~600 emails.
+      if (folder === "inbox" || folder === "sent") {
+        const imapResult = await tryImapFetch(2000).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+        if ("ok" in imapResult && imapResult.ok !== null && imapResult.ok.length > 0) {
+          data = imapResult.ok;
+          localStorage.setItem(PROTO_KEY, "imap");
+        } else if ("err" in imapResult) {
+          connError = (imapResult as { err: string }).err;
         }
-        // firstPage === null means no credentials — fall through silently
-      } catch (e) {
-        connError = String(e);
       }
 
-      // ── Step 2: Outlook COM (Windows only) ───────────────────────────────
+      // ── Step 2: Webmail fallback (single page when IMAP unavailable) ──────
+      if (data === undefined) {
+        try {
+          const session   = getWebmailSession();
+          const firstPage = await fetchWebmailPage(folder, 0, session);
+          if (firstPage !== null) {
+            saveWebmailSession(firstPage.sessionCookie);
+            data = firstPage.messages;
+            localStorage.setItem(PROTO_KEY, "webmail");
+            if (firstPage.hasMore) {
+              startBackgroundPages(folder, 1, firstPage.sessionCookie);
+            } else {
+              fullyLoadedRef.current.add(folder);
+            }
+          }
+        } catch (e) {
+          connError = connError ? `${connError}\n${String(e)}` : String(e);
+        }
+      }
+
+      // ── Step 3: Outlook COM (Windows desktop only) ───────────────────────
       if (data === undefined) {
         const qs  = new URLSearchParams({ folder });
         const res = await fetch(`/api/outlook/messages?${qs}`);
         const comData = await res.json();
-
         if (res.status !== 503 && !comData?.error) {
           data = comData;
           localStorage.setItem(PROTO_KEY, "outlook");
         }
       }
 
-      // ── Step 3: IMAP fallback ─────────────────────────────────────────────
-      if (data === undefined && (folder === "inbox" || folder === "sent")) {
-        const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
-        if ("ok" in imapResult && imapResult.ok !== null) {
-          data = imapResult.ok;
-          localStorage.setItem(PROTO_KEY, "imap");
-        } else if ("err" in imapResult) {
-          connError = connError ? `${connError}\n${(imapResult as { err: string }).err}` : (imapResult as { err: string }).err;
-        }
-      }
-
       // ── Step 4: POP3 fallback ─────────────────────────────────────────────
       if (data === undefined) {
-        const pop3Result = await tryPop3Fetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
+        const pop3Result = await tryPop3Fetch(2000).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
         if ("ok" in pop3Result && pop3Result.ok !== null) {
           data = pop3Result.ok;
           localStorage.setItem(PROTO_KEY, "pop3");
@@ -846,22 +850,22 @@ export default function OutlookPage() {
         .catch(() => {});
     }
 
-    // If webmail credentials exist, ensure PROTO_KEY is "webmail" and clear any stale
-    // IMAP/POP3 cache (entryIds without "web-" prefix) so a fresh webmail load runs.
+    // If IMAP credentials exist, prefer IMAP and clear any stale webmail cache
+    // (entryIds with "web-" prefix from previous webmail-first attempts).
     try {
       const raw = localStorage.getItem("ae_settings_v1");
       if (raw) {
         const cfg = JSON.parse(raw) as Record<string, unknown>;
-        const popHost = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
-        const popUser = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
-        const popPass = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
-        if (popHost && popUser && popPass) {
+        const imapHost = String(cfg.imapHost ?? "");
+        const imapUser = String(cfg.imapUser ?? "");
+        const imapPass = String(cfg.imapPass ?? "");
+        if (imapHost && imapUser && imapPass) {
           const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
-          // Check if cached inbox messages look like non-webmail (no "web-" prefix)
+          // Stale if cached inbox uses webmail entryIds (we now want IMAP)
           const cachedInbox  = msgCache.current.get("inbox") ?? [];
-          const isStaleCache = cachedInbox.length > 0 && !cachedInbox[0].entryId.startsWith("web-");
-          if (currentProto !== "webmail" || isStaleCache) {
-            localStorage.setItem(PROTO_KEY, "webmail");
+          const isStaleCache = cachedInbox.length > 0 && cachedInbox[0].entryId.startsWith("web-");
+          if (currentProto === "webmail" || isStaleCache) {
+            localStorage.setItem(PROTO_KEY, "imap");
             sessionStorage.removeItem(CACHE_KEY);
             localStorage.removeItem(LS_CACHE_KEY);
             msgCache.current.clear();
@@ -872,11 +876,12 @@ export default function OutlookPage() {
     } catch {}
 
     loadMessages("inbox").then(() => {
-      // Prefetch other folders after inbox page-0 loads.
-      // Webmail: load sequentially to avoid session conflicts with inbox background pagination.
+      // Prefetch other folders after inbox loads. IMAP route only supports INBOX,
+      // so for sent/drafts/deleted/junk we always fall back to webmail.
       setTimeout(async () => {
         const proto = localStorage.getItem(PROTO_KEY) ?? "";
-        if (proto === "webmail") {
+        if (proto === "imap" || proto === "webmail") {
+          // Sequential webmail fetch for the secondary folders to avoid session conflicts
           for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
             try {
               const session = getWebmailSession();
@@ -886,7 +891,6 @@ export default function OutlookPage() {
                 setFolderCache(f, result.messages);
               }
             } catch { /* non-critical, ignore */ }
-            // Small gap between folder loads to avoid hammering the server
             await new Promise(r => setTimeout(r, 300));
           }
         } else {
@@ -898,7 +902,7 @@ export default function OutlookPage() {
               .catch(() => {});
           }
         }
-      }, 3000); // Wait 3s so inbox background pagination gets a head start
+      }, 1500);
     });
   }, []); // eslint-disable-line
 
@@ -1196,9 +1200,23 @@ export default function OutlookPage() {
     } catch (e: unknown) { setReplyStatus("오류: " + String(e)); }
   }
 
+  // Open compose dialog in "new mail" mode (no entryId, fresh subject input)
+  function openNewMail() {
+    setComposeMode("new");
+    setComposeSubject("");
+    setComposeToStr("");
+    setComposeCcStr("");
+    setComposeBody("");
+    setReplyStatus("");
+    setComposeQuoteH(0);
+    setComposeAiOpen(false);
+    setComposeOpen(true);
+  }
+
   // Open inline compose panel pre-filled based on action
   function quickOutlookAction(action: "reply" | "replyAll" | "forward") {
     if (!selected) return;
+    setComposeMode("reply");
     setReplyAction(action);
     setComposeBody("");
     setReplyStatus("");
@@ -1233,25 +1251,61 @@ export default function OutlookPage() {
   }
 
   async function sendCompose() {
-    if (!selected || composeSending) return;
+    if (composeSending) return;
+    if (composeMode === "reply" && !selected) return;
+    if (composeMode === "new" && !composeSubject.trim()) {
+      setReplyStatus("제목을 입력하세요");
+      return;
+    }
     setComposeSending(true);
     setReplyStatus("발송 중…");
     try {
-      const res = await fetch("/api/outlook/reply", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          entryId: selected.entryId,
-          body: composeBody,
-          send: true,
-          to: composeToStr,
-          cc: composeCcStr,
-          action: replyAction,
-        }),
-      });
-      const data = await res.json();
+      let data: { error?: string; ok?: boolean };
+
+      if (composeMode === "new") {
+        // New mail: SMTP send (no entryId, no thread quote)
+        const raw = localStorage.getItem("ae_settings_v1");
+        const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+        const smtpHost = String(cfg.smtpHost ?? "");
+        const smtpPort = Number(cfg.smtpPort) || 587;
+        const ssl      = cfg.smtpSsl !== false;
+        const user     = String(cfg.imapUser ?? cfg.popUser ?? "");
+        const pass     = String(cfg.imapPass ?? cfg.popPass ?? "");
+        if (!smtpHost || !user || !pass) {
+          throw new Error("SMTP 설정이 필요합니다 (설정 → SMTP/IMAP).");
+        }
+        const html = `<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${
+          composeBody.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")
+        }</div>`;
+        const res = await fetch("/api/mail/send", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            smtpHost, smtpPort, ssl, user, pass,
+            to: composeToStr, cc: composeCcStr,
+            subject: composeSubject, htmlBody: html,
+          }),
+        });
+        data = await res.json();
+      } else {
+        // Reply / replyAll / forward — needs Outlook entryId (Windows desktop only)
+        const res = await fetch("/api/outlook/reply", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            entryId: selected!.entryId,
+            body: composeBody,
+            send: true,
+            to: composeToStr,
+            cc: composeCcStr,
+            action: replyAction,
+          }),
+        });
+        data = await res.json();
+      }
+
       if (data?.error) throw new Error(data.error);
       setComposeOpen(false);
       setComposeBody("");
+      setComposeSubject("");
       setReplyStatus("");
       setSendSuccessOut(false);
       setSendSuccess(true);
@@ -2373,8 +2427,10 @@ export default function OutlookPage() {
           {/* Title bar */}
           <div className="flex shrink-0 items-center justify-between rounded-t-xl bg-[#0f3460] px-4 py-2.5">
             <span className="text-[13px] font-semibold text-white min-w-0 truncate mr-2">
-              {replyAction === "reply" ? "Reply" : replyAction === "replyAll" ? "Reply All" : "Forward"}
-              {selected && <span className="ml-2 font-normal text-white/60 text-[11px]">{selected.subject}</span>}
+              {composeMode === "new"
+                ? "New Mail"
+                : replyAction === "reply" ? "Reply" : replyAction === "replyAll" ? "Reply All" : "Forward"}
+              {composeMode === "reply" && selected && <span className="ml-2 font-normal text-white/60 text-[11px]">{selected.subject}</span>}
             </span>
             <div className="flex shrink-0 items-center gap-1.5">
               <button
@@ -2387,15 +2443,28 @@ export default function OutlookPage() {
                 </svg>
                 AI
               </button>
-              <button onClick={() => { setComposeOpen(false); setComposeBody(""); setComposeAiOpen(false); }}
+              <button onClick={() => { setComposeOpen(false); setComposeBody(""); setComposeSubject(""); setComposeAiOpen(false); }}
                 className="flex h-6 w-6 items-center justify-center rounded text-white/60 hover:text-white hover:bg-white/20 text-[18px] leading-none">×</button>
             </div>
           </div>
+          {/* Subject (new mail only) */}
+          {composeMode === "new" && (
+            <div className="flex shrink-0 items-center border-b border-ink-100 px-4">
+              <span className="w-10 shrink-0 text-[11px] font-medium text-ink-400">Subject</span>
+              <input
+                autoFocus
+                value={composeSubject}
+                onChange={e => setComposeSubject(e.target.value)}
+                placeholder="Email subject"
+                className="flex-1 bg-transparent py-2.5 text-[12px] text-ink-800 focus:outline-none placeholder:text-ink-300"
+              />
+            </div>
+          )}
           {/* To */}
           <div className="flex shrink-0 items-center border-b border-ink-100 px-4">
             <span className="w-10 shrink-0 text-[11px] font-medium text-ink-400">To</span>
             <input
-              autoFocus
+              autoFocus={composeMode !== "new"}
               value={composeToStr}
               onChange={e => setComposeToStr(e.target.value)}
               placeholder="Email address (separate with semicolons)"
@@ -2418,11 +2487,15 @@ export default function OutlookPage() {
           <textarea
             value={composeBody}
             onChange={e => setComposeBody(e.target.value)}
-            placeholder={replyAction === "forward" ? "Enter forwarding message…" : "Enter reply…"}
+            placeholder={
+              composeMode === "new" ? "Enter your message…" :
+              replyAction === "forward" ? "Enter forwarding message…" : "Enter reply…"
+            }
             className="min-h-[120px] flex-1 resize-none bg-white px-4 py-3 text-[12px] leading-relaxed text-ink-800 focus:outline-none placeholder:text-ink-300"
           />
           {/* Quoted thread history */}
           {(() => {
+            if (composeMode === "new") return null;
             if (!selected) return null;
             if (threadLoading) return (
               <div className="shrink-0 border-t border-ink-100 flex items-center justify-center" style={{ height: 60 }}>
@@ -2602,7 +2675,7 @@ export default function OutlookPage() {
               </span>
             )}
             <div className="flex flex-row items-center gap-2">
-              <button onClick={() => { setComposeOpen(false); setComposeBody(""); }}
+              <button onClick={() => { setComposeOpen(false); setComposeBody(""); setComposeSubject(""); }}
                 className="flex-1 rounded border border-ink-200 px-4 py-1.5 text-[12px] text-ink-600 hover:bg-ink-50 whitespace-nowrap">
                 Cancel
               </button>
@@ -2691,19 +2764,7 @@ export default function OutlookPage() {
           <aside className={`${mobileView === "folders" ? "flex" : "hidden"} md:flex w-full md:w-[220px] shrink-0 flex-col bg-[#f3f6fb] border-r border-ink-200`}>
             <div className="px-3 py-3">
               <button
-                onClick={() => {
-                  const ua = navigator.userAgent;
-                  const isAndroid = /Android/i.test(ua);
-                  const isIOS = /iPhone|iPad|iPod/i.test(ua);
-                  if (isAndroid || isIOS) {
-                    const deepLink = "ms-outlook://compose";
-                    const storeUrl = isIOS
-                      ? "https://apps.apple.com/app/microsoft-outlook/id951937596"
-                      : "https://play.google.com/store/apps/details?id=com.microsoft.office.outlook";
-                    window.location.href = deepLink;
-                    setTimeout(() => { window.location.href = storeUrl; }, 2000);
-                  }
-                }}
+                onClick={() => { openNewMail(); setMobileView("list"); }}
                 className="flex w-full items-center gap-2 rounded border border-[#0078d4] bg-white px-3 py-2 text-[13px] font-medium text-[#0078d4] hover:bg-[#deecf9] whitespace-nowrap">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                   <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>

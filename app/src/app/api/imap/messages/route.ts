@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const secure = body.ssl !== false && body.ssl !== "false";
   const user   = String(body.user ?? "");
   const pass   = String(body.pass ?? "");
-  const limit  = Math.min(Number(body.limit) || 50, 200);
+  const limit  = Math.min(Number(body.limit) || 50, 2000);
 
   if (!host || !user || !pass) {
     return NextResponse.json({ error: "IMAP 설정이 필요합니다 (host, user, pass)" }, { status: 400 });

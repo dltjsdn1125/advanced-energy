@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
   const ssl    = body.ssl !== false && body.ssl !== "false";
   const user   = String(body.user ?? "");
   const pass   = String(body.pass ?? "");
-  const limit  = Math.min(Number(body.limit) || 50, 200);
+  const limit  = Math.min(Number(body.limit) || 50, 2000);
 
   if (!host || !user || !pass) {
     return NextResponse.json({ error: "POP3 설정이 필요합니다 (host, user, pass)" }, { status: 400 });
