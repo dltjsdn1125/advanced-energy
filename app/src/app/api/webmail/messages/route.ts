@@ -169,29 +169,56 @@ export async function POST(request: NextRequest) {
 
     // ── Single-page mode (client-driven pagination) ──────────────────────────
     if (pageParam !== undefined) {
-      const listUrl = `https://${host}/new_mailnara_web/index.php/mail/mail_list/${mailbox}/${pageParam}/${PAGE_SIZE}`;
-      let listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
-      if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
-      let html = await listResp.text();
-      let activeCookie = cookie;
+      // Try several URL variants — some MAILNARA installs filter the default
+      // mail_list URL by date/status, returning a much smaller subset than the
+      // user's actual inbox. Pick whichever variant returns the most rows.
+      const candidates = [
+        // Some installs accept extra path flags like the body URL does (/Y/Y)
+        `https://${host}/new_mailnara_web/index.php/mail/mail_list/${mailbox}/${pageParam}/${PAGE_SIZE}/Y/Y`,
+        // Default (current) — usually filtered to recent mails
+        `https://${host}/new_mailnara_web/index.php/mail/mail_list/${mailbox}/${pageParam}/${PAGE_SIZE}`,
+        // Search variants that often bypass default filters
+        `https://${host}/new_mailnara_web/index.php/mail/mail_list/${mailbox}/${pageParam}/${PAGE_SIZE}/N/Y`,
+        `https://${host}/new_mailnara_web/index.php/mail/mail_list/${mailbox}/${pageParam}/${PAGE_SIZE}/N/N`,
+      ];
 
-      // Re-login when:
-      //   (a) explicit login page in the body, OR
-      //   (b) session was reused (sessionCookie present) AND page 0 came back with
-      //       0 row_ids — strong signal that the cached cookie has rotted out.
-      // Some MAILNARA installs return a quasi-empty list page rather than the
-      // login form when the session has half-expired, so (b) catches that.
-      const hasRowIds = /id=["']row_id_\d+["']/.test(html);
-      const looksLikeLogin = /login\.php|login_id|login_passwd/i.test(html);
-      const sessionRotted = !!sessionCookie && pageParam === 0 && !hasRowIds;
-      if ((looksLikeLogin && !hasRowIds) || sessionRotted) {
-        console.log(`[WEBMAIL] page=${pageParam} re-login (looksLikeLogin=${looksLikeLogin}, sessionRotted=${sessionRotted})`);
-        const freshCookie = await mailnaraLogin(host, user, pass);
-        listResp = await fetch(listUrl, { headers: { Cookie: freshCookie } });
-        if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
-        html = await listResp.text();
-        activeCookie = freshCookie;
+      let bestHtml = "";
+      let bestCount = -1;
+      let bestUrl = "";
+      let activeCookie = cookie;
+      for (const tryUrl of candidates) {
+        try {
+          const r = await fetch(tryUrl, { headers: { Cookie: activeCookie } });
+          if (!r.ok) continue;
+          const txt = await r.text();
+          const matches = txt.match(/id=["']row_id_(\d+)["']/g) ?? [];
+          const cnt = matches.length;
+          // Re-login if we get a login page on a reused session
+          if (cnt === 0 && !!sessionCookie && pageParam === 0 &&
+              (/login\.php|login_id|login_passwd/i.test(txt))) {
+            const fresh = await mailnaraLogin(host, user, pass);
+            activeCookie = fresh;
+            const r2 = await fetch(tryUrl, { headers: { Cookie: fresh } });
+            if (!r2.ok) continue;
+            const t2 = await r2.text();
+            const m2 = t2.match(/id=["']row_id_(\d+)["']/g) ?? [];
+            if (m2.length > bestCount) {
+              bestHtml = t2; bestCount = m2.length; bestUrl = tryUrl;
+            }
+            continue;
+          }
+          if (cnt > bestCount) {
+            bestHtml = txt; bestCount = cnt; bestUrl = tryUrl;
+          }
+        } catch (e) {
+          console.warn(`[WEBMAIL] variant failed ${tryUrl}:`, e);
+        }
       }
+      if (bestCount < 0) throw new Error("모든 mail_list URL 변형 실패");
+      console.log(`[WEBMAIL] best variant for offset=${pageParam}: ${bestUrl} → ${bestCount} rows`);
+      const html = bestHtml;
+      // Re-login already attempted inside the variant loop when a login-page
+      // response was detected on a reused session.
 
       const msgs = parseMailList(html, mailbox);
       const rowIdMatches = html.match(/id=["']row_id_(\d+)["']/g) ?? [];
