@@ -1433,8 +1433,12 @@ export default function OutlookPage() {
         to: opts.to, cc: opts.cc, subject: opts.subject, htmlBody: opts.htmlBody,
       }),
     });
-    const data = await res.json() as { error?: string; ok?: boolean };
-    if (data?.error) throw new Error(data.error);
+    const data = await res.json() as { error?: string; ok?: boolean; hint?: string };
+    if (data?.error) {
+      // Include the server's hint (e.g., explaining IP-policy SMTP rejection)
+      // so the user sees actionable guidance in the alert.
+      throw new Error(data.hint ? `${data.error}\n\n${data.hint}` : data.error);
+    }
   }
 
   // Build the quoted thread + final HTML body for a reply/forward.
