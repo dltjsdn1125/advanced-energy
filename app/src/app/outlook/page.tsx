@@ -2922,7 +2922,20 @@ export default function OutlookPage() {
             {!msgLoading && msgError && (
               <div className="p-4 text-center">
                 <p className="text-[12px] text-red-600 whitespace-pre-wrap break-all">{msgError}</p>
-                <button onClick={() => loadMessages()} className="mt-2 rounded bg-[#0078d4] px-3 py-1.5 text-[12px] text-white whitespace-nowrap">Retry</button>
+                <div className="mt-2 flex justify-center gap-2">
+                  <button onClick={() => loadMessages(activeFolder, true)} className="rounded bg-[#0078d4] px-3 py-1.5 text-[12px] text-white">재시도</button>
+                  <button onClick={async () => {
+                    const cfg = JSON.parse(localStorage.getItem("ae_settings_v1") ?? "{}") as Record<string, unknown>;
+                    const host = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
+                    const user = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
+                    const pass = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
+                    if (!host) { alert("설정에 서버 주소가 없습니다"); return; }
+                    setMsgError("🔍 연결 테스트 중...");
+                    const res = await fetch("/api/webmail/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host, user, pass }) });
+                    const data = await res.json();
+                    setMsgError(JSON.stringify(data, null, 2));
+                  }} className="rounded bg-gray-600 px-3 py-1.5 text-[12px] text-white">연결 진단</button>
+                </div>
               </div>
             )}
             <div className="flex-1 overflow-y-auto">
@@ -3005,7 +3018,20 @@ export default function OutlookPage() {
                 </div>
               )}
               {!msgLoading && filtered.length === 0 && !msgError && (
-                <div className="p-8 text-center text-[13px] text-ink-400">No emails</div>
+                <div className="p-8 text-center text-[13px] text-ink-400">
+                  <p>No emails</p>
+                  <button onClick={async () => {
+                    const cfg = JSON.parse(localStorage.getItem("ae_settings_v1") ?? "{}") as Record<string, unknown>;
+                    const host = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
+                    const user = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
+                    const pass = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
+                    if (!host) { setMsgError("설정에 서버 주소(IMAP/POP3)가 없습니다. Settings → 서버 정보를 입력하세요."); return; }
+                    setMsgError("🔍 연결 테스트 중...");
+                    const res = await fetch("/api/webmail/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host, user, pass }) });
+                    const data = await res.json();
+                    setMsgError(JSON.stringify(data, null, 2));
+                  }} className="mt-2 rounded bg-gray-500 px-3 py-1.5 text-[12px] text-white">연결 진단</button>
+                </div>
               )}
             </div>
           </aside>

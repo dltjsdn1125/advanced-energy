@@ -170,6 +170,13 @@ export async function POST(request: NextRequest) {
       const listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
       if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
       const html = await listResp.text();
+      // Detect redirect to login page (session not working)
+      if (pageParam === 0 && !html.includes("row_id_")) {
+        const isLoginPage = /login\.php|login_id|login_passwd/i.test(html);
+        const snippet = html.slice(0, 300).replace(/\s+/g, " ");
+        console.log(`[WEBMAIL] page0 no row_id_. isLoginPage=${isLoginPage} snippet: ${snippet}`);
+        if (isLoginPage) throw new Error(`웹메일 세션 만료 또는 로그인 실패. 서버 응답: ${snippet}`);
+      }
       const msgs = parseMailList(html, mailbox);
       console.log(`[WEBMAIL] single-page mode page=${pageParam} got=${msgs.length}`);
       return NextResponse.json({
