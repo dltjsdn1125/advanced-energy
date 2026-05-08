@@ -47,12 +47,22 @@ export async function POST(request: NextRequest) {
       const fetchCount = Math.min(limit, total);
       const start = Math.max(1, total - fetchCount + 1);
 
-      // Envelope-only fetch (no body) — 10-100x faster than including bodyParts.
-      // Preview/body is fetched on-demand when the user opens a message.
+      // Envelope + bodyStructure (metadata only, no body content).
+      // bodyStructure lets us count attachments without fetching them.
+      type BodyNode = { disposition?: string; childNodes?: BodyNode[] };
+      function countAttachments(node: BodyNode | undefined): number {
+        if (!node) return 0;
+        let count = 0;
+        if (node.disposition === "attachment") count += 1;
+        for (const child of node.childNodes ?? []) count += countAttachments(child);
+        return count;
+      }
+
       for await (const msg of client.fetch(`${start}:${total}`, {
         uid: true,
         flags: true,
         envelope: true,
+        bodyStructure: true,
       })) {
         try {
           const env = msg.envelope;
@@ -60,6 +70,7 @@ export async function POST(request: NextRequest) {
           const subject = env?.subject ?? "(제목 없음)";
           const date = env?.date ?? null;
           const isUnread = !msg.flags?.has("\\Seen");
+          const attachmentCount = countAttachments(msg.bodyStructure as BodyNode | undefined);
 
           messages.push({
             entryId:        `imap-${msg.uid}`,
@@ -71,7 +82,7 @@ export async function POST(request: NextRequest) {
             preview:        "",
             isUnread,
             isToMe: false,
-            attachmentCount: 0,
+            attachmentCount,
           });
         } catch {
           // skip individual message parse errors

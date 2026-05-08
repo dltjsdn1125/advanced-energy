@@ -15,7 +15,7 @@ interface ThreadMessage {
   entryId: string; subject: string;
   senderName: string; senderEmail: string; sentOn: string;
   body: string; htmlBody: string;
-  attachments: { name: string; size: number }[];
+  attachments: { name: string; size: number; contentType?: string; content?: string }[];
   recipients: { name: string; email: string; rtype: number }[];
 }
 type Tone         = "neutral" | "positive" | "negative" | "custom";
@@ -412,10 +412,22 @@ export default function OutlookPage() {
   const [openaiKey,    setOpenaiKey]    = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const [messages,      setMessages]      = useState<OutlookMessage[]>([]);
+  // Synchronously hydrate from cache so the inbox displays immediately on remount
+  // (previously this was done in useEffect, which caused a brief empty flash).
+  const initialCache = (() => {
+    if (typeof window === "undefined") return { msgs: [] as OutlookMessage[], all: {} as Record<string, { ts?: number; data?: OutlookMessage[] }> };
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY) ?? localStorage.getItem(LS_CACHE_KEY);
+      if (!raw) return { msgs: [] as OutlookMessage[], all: {} as Record<string, { ts?: number; data?: OutlookMessage[] }> };
+      const parsed = JSON.parse(raw) as Record<string, { ts?: number; data?: OutlookMessage[] }>;
+      return { msgs: parsed?.inbox?.data ?? [], all: parsed };
+    } catch { return { msgs: [] as OutlookMessage[], all: {} as Record<string, { ts?: number; data?: OutlookMessage[] }> }; }
+  })();
+
+  const [messages,      setMessages]      = useState<OutlookMessage[]>(initialCache.msgs);
   const [msgLoading,    setMsgLoading]    = useState(false);
   const [isRefreshing,  setIsRefreshing]  = useState(false);
-  const [loadingCount,  setLoadingCount]  = useState(0);
+  const [loadingCount,  setLoadingCount]  = useState(initialCache.msgs.length);
   const [msgError,      setMsgError]      = useState<string | null>(null);
   const [activeFolder, setActiveFolder] = useState<Folder>("inbox");
   const [search,       setSearch]       = useState("");
@@ -433,9 +445,23 @@ export default function OutlookPage() {
   const [iframeH,       setIframeH]       = useState<Record<number, number>>({});
   const [iframeW,       setIframeW]       = useState<Record<number, number>>({});
 
-  // In-memory caches — persist across re-renders, reset on hard reload
-  const msgCache        = useRef<Map<Folder, OutlookMessage[]>>(new Map());
-  const msgCacheTs      = useRef<Map<Folder, number>>(new Map());
+  // In-memory caches — hydrated synchronously from storage on mount
+  const msgCache        = useRef<Map<Folder, OutlookMessage[]>>((() => {
+    const m = new Map<Folder, OutlookMessage[]>();
+    for (const f of REAL_FOLDERS) {
+      const row = initialCache.all?.[f];
+      if (row && Array.isArray(row.data)) m.set(f, row.data);
+    }
+    return m;
+  })());
+  const msgCacheTs      = useRef<Map<Folder, number>>((() => {
+    const m = new Map<Folder, number>();
+    for (const f of REAL_FOLDERS) {
+      const row = initialCache.all?.[f];
+      if (row && typeof row.ts === "number") m.set(f, row.ts);
+    }
+    return m;
+  })());
   const threadCache     = useRef<Map<string, ThreadMessage[]>>(new Map());
   // Ref so background async tasks can check the current folder without stale closure
   const activeFolderRef  = useRef<Folder>("inbox");
@@ -850,27 +876,29 @@ export default function OutlookPage() {
         .catch(() => {});
     }
 
-    // If IMAP credentials exist, prefer IMAP and clear any stale webmail cache
-    // (entryIds with "web-" prefix from previous webmail-first attempts).
+    // One-time migration from webmail to IMAP: only runs once per browser, even if
+    // IMAP later fails. After this, the cache is preserved across navigation.
     try {
+      const migrationDone = localStorage.getItem("ae_imap_migration_v1") === "1";
       const raw = localStorage.getItem("ae_settings_v1");
-      if (raw) {
+      if (!migrationDone && raw) {
         const cfg = JSON.parse(raw) as Record<string, unknown>;
         const imapHost = String(cfg.imapHost ?? "");
         const imapUser = String(cfg.imapUser ?? "");
         const imapPass = String(cfg.imapPass ?? "");
         if (imapHost && imapUser && imapPass) {
           const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
-          // Stale if cached inbox uses webmail entryIds (we now want IMAP)
           const cachedInbox  = msgCache.current.get("inbox") ?? [];
-          const isStaleCache = cachedInbox.length > 0 && cachedInbox[0].entryId.startsWith("web-");
-          if (currentProto === "webmail" || isStaleCache) {
+          const hasWebmailCache = cachedInbox.length > 0 && cachedInbox[0].entryId.startsWith("web-");
+          if (currentProto === "webmail" || hasWebmailCache) {
             localStorage.setItem(PROTO_KEY, "imap");
             sessionStorage.removeItem(CACHE_KEY);
             localStorage.removeItem(LS_CACHE_KEY);
             msgCache.current.clear();
             msgCacheTs.current.clear();
+            setMessages([]);
           }
+          localStorage.setItem("ae_imap_migration_v1", "1");
         }
       }
     } catch {}
@@ -975,7 +1003,28 @@ export default function OutlookPage() {
     setThread([]); setThreadLoading(true);
     try {
       let fetchedMsgs: unknown[];
-      if (msg.entryId.startsWith("web-")) {
+      if (msg.entryId.startsWith("imap-")) {
+        // IMAP — fetch single message with body + attachments by UID
+        const uid = msg.entryId.slice(5);
+        const raw = localStorage.getItem("ae_settings_v1");
+        const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+        const res = await fetch("/api/imap/thread", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            host: String(cfg.imapHost ?? ""),
+            port: Number(cfg.imapPort) || 993,
+            ssl:  cfg.imapSsl !== false,
+            user: String(cfg.imapUser ?? ""),
+            pass: String(cfg.imapPass ?? ""),
+            uid,
+            folder: "INBOX",
+          }),
+        });
+        const data = await res.json();
+        if (data?.error) throw new Error(data.error);
+        fetchedMsgs = Array.isArray(data) ? data : [];
+      } else if (msg.entryId.startsWith("web-")) {
         // MAILNARA webmail — Outlook COM 없이 HTTPS로 본문 가져오기
         // entryId format: "web-{uid}" for Inbox, "web-{Mailbox}:{uid}" for other folders
         const raw2 = msg.entryId.slice(4);
@@ -1021,8 +1070,29 @@ export default function OutlookPage() {
     finally { setThreadLoading(false); }
   }
 
-  function downloadAtt(entryId: string, name: string) {
-    window.open(`/api/outlook/attachment?${new URLSearchParams({ entryId, name })}`, "_blank");
+  function downloadAtt(entryId: string, att: { name: string; contentType?: string; content?: string }) {
+    // IMAP / webmail attachments arrive as base64 in the thread response — convert to blob URL
+    if (att.content) {
+      try {
+        const binary = atob(att.content);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: att.contentType || "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = att.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30_000);
+        return;
+      } catch (e) {
+        console.error("[downloadAtt] blob fail:", e);
+      }
+    }
+    // Outlook COM fallback (Windows desktop)
+    window.open(`/api/outlook/attachment?${new URLSearchParams({ entryId, name: att.name })}`, "_blank");
   }
 
   async function translateThread() {
@@ -3276,7 +3346,7 @@ export default function OutlookPage() {
                             {msg.attachments.length > 0 && (
                               <div className="mt-1.5 flex flex-wrap gap-1.5">
                                 {msg.attachments.map((att, ai) => (
-                                  <button key={ai} onClick={() => downloadAtt(msg.entryId, att.name)}
+                                  <button key={ai} onClick={() => downloadAtt(msg.entryId, att)}
                                     className="flex items-center gap-1 rounded border border-ink-200 bg-white px-2 py-0.5 text-[11px] text-ink-700 hover:border-[#0078d4] hover:text-[#0078d4] transition">
                                     {fileIcon(att.name)}
                                     <span className="max-w-[180px] truncate">{att.name}</span>
