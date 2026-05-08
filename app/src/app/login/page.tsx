@@ -1,7 +1,6 @@
 "use client";
 import { useState, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase";
 
@@ -174,7 +173,6 @@ export default function LoginPage() {
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm rounded-xl border border-black/10 bg-white p-8 shadow-sm">
         <div className="mb-6 flex flex-col items-center gap-3">
-          <Image src="/logo.png" alt="Advanced Energy" width={120} height={42} className="h-10 w-auto object-contain" priority />
           <p className="text-sm text-black/50">Internal Tools · Sign in</p>
         </div>
         <Suspense>

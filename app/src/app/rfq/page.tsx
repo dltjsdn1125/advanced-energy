@@ -2926,10 +2926,6 @@ Web   : www.advancedenergy.com
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex h-14 items-center gap-2 pl-2 pr-3 md:h-16 md:gap-4 md:pl-2 md:pr-6">
-            <Link href="/" className="flex shrink-0 items-center gap-2">
-              <Image src="/logo.png" alt="Advanced Energy" width={180} height={48} className="h-8 w-auto object-contain md:h-12" priority />
-              <span className="mono hidden rounded-pill border border-zinc-300 px-2 py-0.5 text-[11px] text-black sm:inline">RFQ</span>
-            </Link>
             <div className="flex-1" />
             <div className="hidden items-center gap-2 md:flex">
               <Link href="/" className="mono whitespace-nowrap rounded-pill border border-zinc-300 bg-white px-3 py-1.5 text-[12px] text-black hover:bg-lime">← 카탈로그</Link>
@@ -3079,7 +3075,6 @@ Web   : www.advancedenergy.com
                 <tr>
                   <th colSpan={4} className="rfq-full-cell border-b border-zinc-300 bg-white px-4 py-3">
                     <div className="flex items-center gap-2 sm:gap-4">
-                      <Image src="/logo.png" alt="Advanced Energy" width={160} height={42} className="h-7 w-auto shrink-0 object-contain sm:h-9" priority />
                       <span className="mono flex-1 text-center text-[14px] font-black tracking-[0.04em] text-black sm:whitespace-nowrap sm:text-[22px] sm:tracking-[0.06em]">
                         SMPS Product Specification Request
                       </span>

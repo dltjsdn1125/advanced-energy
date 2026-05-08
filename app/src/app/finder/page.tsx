@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { getCatalog, assetSrc } from "@/lib/data";
 import {
@@ -551,21 +550,6 @@ export default function FinderPage() {
     <div className="min-h-[100dvh] bg-white">
       <header className="sticky top-0 z-40 border-b border-ink-100 bg-white shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex h-14 items-center gap-2 pl-2 pr-3 md:h-16 md:gap-4 md:pr-6">
-          {/* Logo */}
-          <Link href="/" className="flex shrink-0 items-center gap-2">
-            <Image
-              src="/logo.png"
-              alt="Advanced Energy"
-              width={180}
-              height={48}
-              className="h-8 w-auto object-contain md:h-12"
-              priority
-            />
-            <span className="mono hidden rounded-pill border border-ink-200 px-2 py-0.5 text-[11px] text-ink-700 sm:inline">
-              제품 파인더
-            </span>
-          </Link>
-
           {/* Desktop nav */}
           <div className="hidden items-center gap-3 md:flex">
             <Link href="/" className="mono whitespace-nowrap text-[13px] text-black underline underline-offset-2 hover:text-ink-700">

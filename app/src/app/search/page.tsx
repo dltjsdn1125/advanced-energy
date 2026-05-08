@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { getCatalog, getSpecIndex } from "@/lib/data";
 import type { Model, Spec, SpecValue } from "@/lib/types";
@@ -355,20 +354,6 @@ export default function SearchPage() {
               <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </button>
-          {/* Logo */}
-          <Link href="/" className="flex shrink-0 items-center gap-2">
-            <Image
-              src="/logo.png"
-              alt="Advanced Energy"
-              width={180}
-              height={48}
-              className="h-8 w-auto object-contain md:h-12"
-              priority
-            />
-            <span className="mono hidden rounded-pill border border-ink-200 px-2 py-0.5 text-[11px] text-ink-700 sm:inline">
-              Spec Search
-            </span>
-          </Link>
           <Link
             href="/"
             className="mono hidden whitespace-nowrap text-[13px] text-black underline underline-offset-2 hover:text-ink-700 md:inline"
