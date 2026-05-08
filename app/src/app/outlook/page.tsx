@@ -462,7 +462,10 @@ export default function OutlookPage() {
   const activeFolderRef  = useRef<Folder>("inbox");
   // Track which folders have been fully loaded (all pages) and which are currently loading
   const fullyLoadedRef   = useRef<Set<Folder>>(new Set());
-  const bgLoadingRef     = useRef<Set<Folder>>(new Set());
+  // Separate mutexes per protocol so an in-flight IMAP attempt doesn't block
+  // the webmail background pagination loop from making progress.
+  const bgLoadingRef     = useRef<Set<Folder>>(new Set()); // webmail page loop
+  const imapEnhanceRef   = useRef<Set<Folder>>(new Set()); // IMAP enhance attempt
 
   const persistMsgCache = useCallback(() => {
     try {
@@ -732,12 +735,12 @@ export default function OutlookPage() {
 
       const capturedFolder = folder;
 
-      // Trigger IMAP background enhancement when available — replaces the old
-      // webmail-page-0 background call which competed with Step 1 / secondary
-      // folder prefetch and caused MAILNARA to return empty under concurrency.
+      // Trigger IMAP background enhancement when available. Uses its own mutex
+      // (imapEnhanceRef) so it can't block the webmail page loop, which uses
+      // bgLoadingRef independently.
       if ((capturedFolder === "inbox" || capturedFolder === "sent")
-          && !bgLoadingRef.current.has(capturedFolder)) {
-        bgLoadingRef.current.add(capturedFolder);
+          && !imapEnhanceRef.current.has(capturedFolder)) {
+        imapEnhanceRef.current.add(capturedFolder);
         (async () => {
           try {
             const imapMsgs = await tryImapFetch(2000);
@@ -754,7 +757,7 @@ export default function OutlookPage() {
               }
             }
           } catch (e) { console.warn("[IMAP cache-serve enhance] failed:", e); }
-          finally { bgLoadingRef.current.delete(capturedFolder); }
+          finally { imapEnhanceRef.current.delete(capturedFolder); }
         })();
       }
       return;
@@ -801,9 +804,10 @@ export default function OutlookPage() {
       }
 
       // ── Step 1b: IMAP background enhance — fetch all msgs and replace if we get more ──
-      // Runs only for inbox/sent. Doesn't block the initial display.
-      if ((folder === "inbox" || folder === "sent") && !bgLoadingRef.current.has(folder)) {
-        bgLoadingRef.current.add(folder);
+      // Uses imapEnhanceRef (independent of bgLoadingRef) so it doesn't block
+      // the webmail page loop started just below for hasMore=true responses.
+      if ((folder === "inbox" || folder === "sent") && !imapEnhanceRef.current.has(folder)) {
+        imapEnhanceRef.current.add(folder);
         (async () => {
           try {
             const imapMsgs = await tryImapFetch(2000);
@@ -822,7 +826,7 @@ export default function OutlookPage() {
           } catch (e) {
             console.warn("[IMAP background] failed:", e);
           } finally {
-            bgLoadingRef.current.delete(folder);
+            imapEnhanceRef.current.delete(folder);
           }
         })();
       }

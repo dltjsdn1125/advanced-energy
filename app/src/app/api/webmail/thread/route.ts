@@ -166,30 +166,47 @@ async function fetchAttachmentList(
   for (const url of candidates) {
     try {
       const resp = await fetch(url, { headers: { Cookie: cookie } });
+      console.log(`[WEBMAIL-THREAD] attach probe ${url} → status=${resp.status}`);
       if (!resp.ok) continue;
       const html = await resp.text();
       const list: AttachmentMeta[] = [];
 
-      // Pattern A: anchors that point at MAILNARA's attachment download endpoint.
-      const downloadPattern = /<a\b[^>]*?href=["']([^"']*?(?:download|attach|maildownload)[^"']*?)["'][^>]*>([\s\S]*?)<\/a>/gi;
+      // Pattern A: any anchor whose href points at a download-ish endpoint
+      const downloadPattern = /<a\b[^>]*?href=["']([^"']*?(?:download|attach|maildownload|mail_attach|attachment)[^"']*?)["'][^>]*>([\s\S]*?)<\/a>/gi;
       let m: RegExpExecArray | null;
       while ((m = downloadPattern.exec(html)) !== null) {
         const inner = m[2].replace(/<[^>]+>/g, "").trim();
         if (!inner || inner.length > 200) continue;
         const cleaned = inner.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
-        // Skip non-filename labels
         if (/^\s*(다운로드|download|첨부|view|보기|미리보기|preview)\s*$/i.test(cleaned)) continue;
-        // Some entries have "name (size)" — split
         const sm = cleaned.match(/^(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]\s*$/i);
         const name = tryDecodeURI(sm ? sm[1].trim() : cleaned);
         const size = sm ? parseSize(sm[2]) : 0;
         list.push({ name, size });
       }
 
-      if (list.length > 0) {
-        console.log(`[WEBMAIL-THREAD] found ${list.length} attachment(s) via ${url}`);
-        return list;
+      // Pattern B: MAILNARA's attachment row markup — `class="attach_*"`, `class="m-file"`, etc.
+      const attachRowPattern = /<(?:li|tr|div)\b[^>]*class=["'][^"']*(?:m-file|attach|file_list|file_row)[^"']*["'][^>]*>([\s\S]*?)<\/(?:li|tr|div)>/gi;
+      while ((m = attachRowPattern.exec(html)) !== null) {
+        const inner = m[1];
+        const txt = inner.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        if (!txt || txt.length > 300) continue;
+        const sm = txt.match(/(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]/i);
+        if (sm) {
+          list.push({ name: tryDecodeURI(sm[1].trim()), size: parseSize(sm[2]) });
+        }
       }
+
+      // Dedupe by name
+      const seen = new Set<string>();
+      const deduped = list.filter(a => {
+        if (seen.has(a.name)) return false;
+        seen.add(a.name);
+        return true;
+      });
+
+      console.log(`[WEBMAIL-THREAD] ${url} → htmlLen=${html.length} parsed=${deduped.length}`);
+      if (deduped.length > 0) return deduped;
     } catch (e) {
       console.warn(`[WEBMAIL-THREAD] attach url failed ${url}:`, String(e));
     }
