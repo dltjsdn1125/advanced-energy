@@ -202,7 +202,11 @@ async function fetchAttachmentList(
 function parseAttachmentsFromHtml(html: string): AttachmentMeta[] {
   const list: AttachmentMeta[] = [];
 
-  // Pattern 1: anchors with download-ish hrefs (PRIMARY — gives us href)
+  // Pattern 1: anchors with MAILNARA-style download hrefs.
+  // CRITICAL: only accept anchors whose HREF actually points at a MAILNARA
+  // attachment endpoint. Body emails frequently contain marketing PDF links
+  // to external sites (e.g. artesyn.com) — the old "filename.pdf in link
+  // text" heuristic mis-identified those as attachments.
   const linkPattern = /<a\b[^>]*?href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = linkPattern.exec(html)) !== null) {
@@ -211,10 +215,17 @@ function parseAttachmentsFromHtml(html: string): AttachmentMeta[] {
     if (!inner || inner.length > 200) continue;
     if (/^\s*(다운로드|download|첨부|view|보기|미리보기|preview|reply|회신|이전|다음)\s*$/i.test(inner)) continue;
 
-    // accept if href points at download endpoint OR if the link text has a file extension
-    const hrefLooksLikeDownload = /(?:download|attach|maildownload|mail_attach|attachment|file_down)/i.test(href);
-    const textHasExtension = /\.(pdf|xlsx?|docx?|hwp|zip|jpg|jpeg|png|gif|pptx?|txt|csv|rar|7z|mp[34]|wav|avi|mov|psd|ai|dwg|step|stp|iges?|igs)\b/i.test(inner);
-    if (!hrefLooksLikeDownload && !textHasExtension) continue;
+    // Must be a real MAILNARA download URL: relative path OR contains a
+    // MAILNARA-specific endpoint name. External http(s)://other-site/file.pdf
+    // is rejected outright — those are inline links in the email body, not
+    // server-stored attachments we can proxy via session cookie.
+    const isRelativeOrAbsoluteSamePath =
+      href.startsWith("/") ||
+      href.startsWith("?") ||
+      (!/^https?:/i.test(href) && !/^javascript:/i.test(href) && !/^mailto:/i.test(href));
+    const hrefHasMailnaraDownloadEndpoint =
+      /(?:\/|\b)(?:maildownload|mail_attach|mail_download|file_down|attach_download|download)(?:[\/\?]|\.php|$)/i.test(href);
+    if (!isRelativeOrAbsoluteSamePath && !hrefHasMailnaraDownloadEndpoint) continue;
 
     const sm = inner.match(/^(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]\s*$/i);
     const name = tryDecodeURI(sm ? sm[1].trim() : inner);

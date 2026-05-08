@@ -648,7 +648,10 @@ export default function OutlookPage() {
     const mailProto = localStorage.getItem(PROTO_KEY) ?? "";
 
     // ── Helper: merge new messages into cache & update UI ─────────────────────
-    const applyMerge = (capturedFolder: Folder, newMsgs: OutlookMessage[], prepend: boolean) => {
+    // Returns the count of truly-new messages added. Callers (e.g., the
+    // background page loop) use this to detect "no new mails on this page"
+    // and stop paginating when MAILNARA starts repeating the tail.
+    const applyMerge = (capturedFolder: Folder, newMsgs: OutlookMessage[], prepend: boolean): number => {
       const existing = msgCache.current.get(capturedFolder) ?? [];
       const existingIds = new Set(existing.map(m => m.entryId.toUpperCase()));
       const trulyNew = newMsgs.filter(m => !existingIds.has(m.entryId.toUpperCase()));
@@ -658,7 +661,7 @@ export default function OutlookPage() {
         const refreshed = existing.map(m => updMap.get(m.entryId.toUpperCase()) ?? m);
         setFolderCache(capturedFolder, refreshed);
         if (activeFolderRef.current === capturedFolder) setMessages(refreshed);
-        return;
+        return 0;
       }
       const merged = prepend ? [...trulyNew, ...existing] : [...existing, ...trulyNew];
       setFolderCache(capturedFolder, merged);
@@ -666,31 +669,34 @@ export default function OutlookPage() {
         setMessages([...merged]);
         setLoadingCount(merged.length);
       }
+      return trulyNew.length;
     };
 
     // ── Background webmail page loader (runs after page 0 is shown) ──────────
-    // Sequential fetch — MAILNARA's pagination uses session-side cursor state,
-    // and concurrent requests on the same session race the cursor, causing
-    // duplicates and early termination. Sequential is slower but reliable.
-    // To partially recover speed, we tolerate up to MAX_CONSECUTIVE_EMPTY empty
-    // pages before giving up (some MAILNARA installs have transient empty
-    // responses mid-pagination when the cursor lands between batches).
+    // Sequential fetch. We stop on:
+    //   - MAX_CONSECUTIVE_EMPTY pages with 0 messages, OR
+    //   - MAX_CONSECUTIVE_NO_NEW pages where applyMerge added no NEW msgs
+    //     (this catches MAILNARA's "trailing repeat" pattern where the cursor
+    //     stops advancing past the end and each page just returns the last
+    //     14, 13, 12, ... mails of the inbox over and over).
     const startBackgroundPages = (capturedFolder: Folder, startPage: number, initCookie: string) => {
       if (bgLoadingRef.current.has(capturedFolder)) return;
       bgLoadingRef.current.add(capturedFolder);
       const MAX_CONSECUTIVE_EMPTY = 2;
+      const MAX_CONSECUTIVE_NO_NEW = 2;
       const HARD_PAGE_CAP = 200;
       (async () => {
         let page = startPage;
         let cookie = initCookie;
         let consecutiveEmpty = 0;
+        let consecutiveNoNew = 0;
         while (page < HARD_PAGE_CAP) {
           try {
             const result = await fetchWebmailPage(capturedFolder, page, cookie);
             if (!result) break;
             cookie = result.sessionCookie || cookie;
             saveWebmailSession(cookie);
-            applyMerge(capturedFolder, result.messages, page === 0);
+            const added = applyMerge(capturedFolder, result.messages, page === 0);
             if (result.messages.length === 0) {
               consecutiveEmpty++;
               if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
@@ -699,6 +705,16 @@ export default function OutlookPage() {
               }
             } else {
               consecutiveEmpty = 0;
+            }
+            if (added === 0 && result.messages.length > 0) {
+              consecutiveNoNew++;
+              if (consecutiveNoNew >= MAX_CONSECUTIVE_NO_NEW) {
+                console.log(`[bg pages] reached tail — ${consecutiveNoNew} pages with no new msgs at page=${page}`);
+                fullyLoadedRef.current.add(capturedFolder);
+                break;
+              }
+            } else if (added > 0) {
+              consecutiveNoNew = 0;
             }
             if (!result.hasMore && consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
               fullyLoadedRef.current.add(capturedFolder);
