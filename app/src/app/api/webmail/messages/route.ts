@@ -170,20 +170,24 @@ export async function POST(request: NextRequest) {
       let listResp = await fetch(listUrl, { headers: { Cookie: cookie } });
       if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
       let html = await listResp.text();
+      let activeCookie = cookie;
 
-      // If session expired (login page in response), re-login once and retry
-      const isLoginPage = (h: string) => /login\.php|login_id|login_passwd/i.test(h) && !h.includes("row_id_");
-      if (isLoginPage(html)) {
-        console.log(`[WEBMAIL] page=${pageParam} session expired — re-login`);
+      // Re-login when:
+      //   (a) explicit login page in the body, OR
+      //   (b) session was reused (sessionCookie present) AND page 0 came back with
+      //       0 row_ids — strong signal that the cached cookie has rotted out.
+      // Some MAILNARA installs return a quasi-empty list page rather than the
+      // login form when the session has half-expired, so (b) catches that.
+      const hasRowIds = /id=["']row_id_\d+["']/.test(html);
+      const looksLikeLogin = /login\.php|login_id|login_passwd/i.test(html);
+      const sessionRotted = !!sessionCookie && pageParam === 0 && !hasRowIds;
+      if ((looksLikeLogin && !hasRowIds) || sessionRotted) {
+        console.log(`[WEBMAIL] page=${pageParam} re-login (looksLikeLogin=${looksLikeLogin}, sessionRotted=${sessionRotted})`);
         const freshCookie = await mailnaraLogin(host, user, pass);
         listResp = await fetch(listUrl, { headers: { Cookie: freshCookie } });
         if (!listResp.ok) throw new Error(`메일 목록 가져오기 실패: HTTP ${listResp.status}`);
         html = await listResp.text();
-        if (isLoginPage(html)) throw new Error("웹메일 세션 만료 후 재로그인 실패");
-        // Return fresh cookie so client reuses it for next pages
-        const msgs2 = parseMailList(html, mailbox);
-        console.log(`[WEBMAIL] page=${pageParam} re-login ok got=${msgs2.length}`);
-        return NextResponse.json({ messages: msgs2, hasMore: msgs2.length > 0, sessionCookie: freshCookie });
+        activeCookie = freshCookie;
       }
 
       const msgs = parseMailList(html, mailbox);
@@ -193,7 +197,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         messages: msgs,
         hasMore: msgs.length > 0,
-        sessionCookie: cookie,
+        sessionCookie: activeCookie,
         _debug: { htmlLen: html.length, rowIdCount, mailbox, page: pageParam },
       });
     }

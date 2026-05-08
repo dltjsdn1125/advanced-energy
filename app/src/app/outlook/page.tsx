@@ -405,7 +405,8 @@ async function fetchWebmailPage(
       _debug?: { htmlLen?: number; rowIdCount?: number; mailbox?: string; page?: number };
     };
     if (data._debug) {
-      console.log(`[fetchWebmailPage debug]`, data._debug);
+      const d = data._debug;
+      console.log(`[fetchWebmailPage debug] folder=${folder} page=${page} htmlLen=${d.htmlLen} rowIdCount=${d.rowIdCount} mailbox=${d.mailbox}`);
     }
     if (data?.error) {
       console.error(`[fetchWebmailPage] folder=${folder} page=${page} server error:`, data.error);
