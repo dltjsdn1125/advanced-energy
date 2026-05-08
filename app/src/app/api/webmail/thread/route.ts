@@ -126,12 +126,83 @@ function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+interface AttachmentMeta {
+  name: string;
+  size: number;
+  contentType?: string;
+  content?: string;
+}
+
+// Decode percent-encoded UTF-8 strings safely
+function tryDecodeURI(s: string): string {
+  try { return decodeURIComponent(s); } catch { return s; }
+}
+
+// Format bytes from a "12.3 KB" / "12345 byte" / "1.2MB" string
+function parseSize(s: string): number {
+  const m = s.match(/([\d,.]+)\s*(KB|MB|GB|byte|bytes|B)?/i);
+  if (!m) return 0;
+  const n = parseFloat(m[1].replace(/,/g, ""));
+  if (isNaN(n)) return 0;
+  const unit = (m[2] ?? "byte").toUpperCase();
+  if (unit === "KB") return Math.round(n * 1024);
+  if (unit === "MB") return Math.round(n * 1024 * 1024);
+  if (unit === "GB") return Math.round(n * 1024 * 1024 * 1024);
+  return Math.round(n);
+}
+
+// MAILNARA 4.x exposes attachments via mail_view (or similar). Parse links.
+async function fetchAttachmentList(
+  host: string,
+  cookie: string,
+  uid: string,
+  mailbox: string,
+): Promise<AttachmentMeta[]> {
+  const candidates = [
+    `https://${host}/new_mailnara_web/index.php/mail/mail_view/${mailbox}/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/mail/mail_view_v3/${mailbox}/${uid}`,
+    `https://${host}/new_mailnara_web/index.php/maildecode/mail_attach_list/${mailbox}/${uid}`,
+  ];
+  for (const url of candidates) {
+    try {
+      const resp = await fetch(url, { headers: { Cookie: cookie } });
+      if (!resp.ok) continue;
+      const html = await resp.text();
+      const list: AttachmentMeta[] = [];
+
+      // Pattern A: anchors that point at MAILNARA's attachment download endpoint.
+      const downloadPattern = /<a\b[^>]*?href=["']([^"']*?(?:download|attach|maildownload)[^"']*?)["'][^>]*>([\s\S]*?)<\/a>/gi;
+      let m: RegExpExecArray | null;
+      while ((m = downloadPattern.exec(html)) !== null) {
+        const inner = m[2].replace(/<[^>]+>/g, "").trim();
+        if (!inner || inner.length > 200) continue;
+        const cleaned = inner.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+        // Skip non-filename labels
+        if (/^\s*(다운로드|download|첨부|view|보기|미리보기|preview)\s*$/i.test(cleaned)) continue;
+        // Some entries have "name (size)" — split
+        const sm = cleaned.match(/^(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]\s*$/i);
+        const name = tryDecodeURI(sm ? sm[1].trim() : cleaned);
+        const size = sm ? parseSize(sm[2]) : 0;
+        list.push({ name, size });
+      }
+
+      if (list.length > 0) {
+        console.log(`[WEBMAIL-THREAD] found ${list.length} attachment(s) via ${url}`);
+        return list;
+      }
+    } catch (e) {
+      console.warn(`[WEBMAIL-THREAD] attach url failed ${url}:`, String(e));
+    }
+  }
+  return [];
+}
+
 async function fetchBody(
   host: string,
   cookie: string,
   uid: string,
   mailbox = "Inbox",
-): Promise<{ htmlBody: string; body: string }> {
+): Promise<{ htmlBody: string; body: string; attachments: AttachmentMeta[] }> {
   // MAILNARA 4.x: body is in an iframe at maildecode/mail_content_body
   const bodyUrl = `https://${host}/new_mailnara_web/index.php/maildecode/mail_content_body/${mailbox}/${uid}/N/N`;
   console.log(`[WEBMAIL-THREAD] fetching body url: ${bodyUrl}`);
@@ -142,7 +213,13 @@ async function fetchBody(
   const baseHref = `https://${host}/`;
   // Inline relative images as data URIs so they load without the session cookie
   const inlinedHtml = await inlineImages(html, host, cookie);
-  return { htmlBody: injectFont(inlinedHtml, baseHref), body: stripTags(html).slice(0, 2000) };
+  // Fetch attachment list in parallel (best effort)
+  const attachments = await fetchAttachmentList(host, cookie, uid, mailbox).catch(() => [] as AttachmentMeta[]);
+  return {
+    htmlBody: injectFont(inlinedHtml, baseHref),
+    body: stripTags(html).slice(0, 2000),
+    attachments,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -166,7 +243,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const cookie = sessionCookie || await mailnaraLogin(host, user, pass);
-    const { htmlBody, body: plainBody } = await fetchBody(host, cookie, uid, mailbox);
+    const { htmlBody, body: plainBody, attachments } = await fetchBody(host, cookie, uid, mailbox);
 
     const thread = [{
       entryId:     `web-${uid}`,
@@ -176,7 +253,7 @@ export async function POST(request: NextRequest) {
       sentOn,
       body:        plainBody,
       htmlBody,
-      attachments: [],
+      attachments,
       recipients:  [],
     }];
 
