@@ -669,27 +669,50 @@ export default function OutlookPage() {
     };
 
     // ── Background webmail page loader (runs after page 0 is shown) ──────────
-    // startPage=0 → fresh load (will prepend new msgs, then append older ones)
-    // startPage>0 → continuation (append-only)
+    // Fires pages in parallel batches of CONCURRENCY for speed. With concurrent
+    // access blocking off, MAILNARA handles 5+ simultaneous requests fine.
+    // 40 sequential pages × 1.5s = 60s → 8 batches × 1.5s = ~12s.
     const startBackgroundPages = (capturedFolder: Folder, startPage: number, initCookie: string) => {
       if (bgLoadingRef.current.has(capturedFolder)) return; // already running
       bgLoadingRef.current.add(capturedFolder);
+      const CONCURRENCY = 5;
       (async () => {
-        let page   = startPage;
-        let cookie = initCookie; // "" triggers fresh login on first request
-        while (true) {
-          try {
-            const result = await fetchWebmailPage(capturedFolder, page, cookie);
-            if (!result) break;
-            cookie = result.sessionCookie || cookie;
-            saveWebmailSession(cookie);
-            applyMerge(capturedFolder, result.messages, page === 0); // prepend only on p0
-            if (!result.hasMore) {
-              fullyLoadedRef.current.add(capturedFolder);
+        let page = startPage;
+        let cookie = initCookie;
+        let stop = false;
+        while (!stop) {
+          // Build a batch of CONCURRENCY page fetches
+          const batch: number[] = [];
+          for (let i = 0; i < CONCURRENCY; i++) batch.push(page + i);
+          const results = await Promise.allSettled(
+            batch.map(p => fetchWebmailPage(capturedFolder, p, cookie)),
+          );
+          // Process results in page order so applyMerge ordering stays sane
+          let highestNonEmpty = -1;
+          for (let i = 0; i < results.length; i++) {
+            const r = results[i];
+            if (r.status !== "fulfilled" || !r.value) continue;
+            const v = r.value;
+            cookie = v.sessionCookie || cookie;
+            if (v.messages.length > 0) highestNonEmpty = i;
+            applyMerge(capturedFolder, v.messages, batch[i] === 0);
+            // If a page returns 0 messages OR hasMore=false, that's the end
+            if (!v.hasMore || v.messages.length === 0) {
+              // But only stop if all preceding pages in this batch were also empty;
+              // otherwise the empty might be a transient miss in the middle.
+              if (i <= highestNonEmpty) continue;
+              stop = true;
               break;
             }
-            page++;
-          } catch { break; }
+          }
+          if (cookie) saveWebmailSession(cookie);
+          if (stop) {
+            fullyLoadedRef.current.add(capturedFolder);
+            break;
+          }
+          page += CONCURRENCY;
+          // Hard cap to prevent infinite loops if MAILNARA misbehaves
+          if (page > 200) break;
         }
         bgLoadingRef.current.delete(capturedFolder);
       })();
@@ -833,28 +856,38 @@ export default function OutlookPage() {
         connError = String(e);
       }
 
-      // ── Step 1b: IMAP background enhance — fetch all msgs and replace if we get more ──
-      // Uses imapEnhanceRef (independent of bgLoadingRef) so it doesn't block
-      // the webmail page loop started just below for hasMore=true responses.
+      // ── Step 1b: IMAP+POP3 background enhance — race them, use whichever wins.
+      // Independent mutex (imapEnhanceRef) so the webmail page loop is not
+      // blocked. POP3 typically returns the entire inbox in one shot.
       if ((folder === "inbox" || folder === "sent") && !imapEnhanceRef.current.has(folder)) {
         imapEnhanceRef.current.add(folder);
         (async () => {
           try {
-            const imapMsgs = await tryImapFetch(2000);
-            if (Array.isArray(imapMsgs) && imapMsgs.length > 0) {
+            const [imapResult, pop3Result] = await Promise.allSettled([
+              tryImapFetch(2000),
+              tryPop3Fetch(2000),
+            ]);
+            const imapMsgs = imapResult.status === "fulfilled" ? imapResult.value : null;
+            const pop3Msgs = pop3Result.status === "fulfilled" ? pop3Result.value : null;
+            const imapLen = Array.isArray(imapMsgs) ? imapMsgs.length : 0;
+            const pop3Len = Array.isArray(pop3Msgs) ? pop3Msgs.length : 0;
+            console.log(`[full-load bg enhance] IMAP=${imapLen} POP3=${pop3Len}`);
+            const winner = imapLen >= pop3Len ? imapMsgs : pop3Msgs;
+            const winnerProto = imapLen >= pop3Len ? "imap" : "pop3";
+            if (Array.isArray(winner) && winner.length > 0) {
               const cur = msgCache.current.get(folder) ?? [];
-              if (imapMsgs.length > cur.length) {
-                setFolderCache(folder, imapMsgs);
+              if (winner.length > cur.length) {
+                setFolderCache(folder, winner);
                 if (activeFolderRef.current === folder) {
-                  setMessages(imapMsgs);
-                  setLoadingCount(imapMsgs.length);
+                  setMessages(winner);
+                  setLoadingCount(winner.length);
                 }
-                localStorage.setItem(PROTO_KEY, "imap");
+                localStorage.setItem(PROTO_KEY, winnerProto);
                 fullyLoadedRef.current.add(folder);
               }
             }
           } catch (e) {
-            console.warn("[IMAP background] failed:", e);
+            console.warn("[full-load bg enhance] failed:", e);
           } finally {
             imapEnhanceRef.current.delete(folder);
           }

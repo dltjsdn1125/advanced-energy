@@ -129,10 +129,10 @@ function parseMailList(html: string, mailbox = "Inbox"): unknown[] {
   return messages;
 }
 
-// MAILNARA appears to ignore small size requests and return its own default
-// (~15 rows). We send a very large size to encourage the server to dump the
-// whole inbox in one shot when its own pagination is broken/disabled.
-const PAGE_SIZE = 1000;
+// User requested 50 per page. MAILNARA may or may not respect this — if it
+// caps at its internal default we still get the same 15, but on installs
+// that honor the size parameter this triples our throughput per request.
+const PAGE_SIZE = 50;
 // Kept for legacy full-pagination mode only
 const FETCH_TIMEOUT_MS = 25_000;
 
