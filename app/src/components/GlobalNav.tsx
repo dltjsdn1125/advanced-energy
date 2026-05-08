@@ -10,7 +10,7 @@ const NAV = [
   { href: "/search",   label: "Search" },
   { href: "/finder",   label: "Finder" },
   { href: "/rfq",      label: "Recording spec" },
-  { href: "/outlook",  label: "Mail" },
+  { href: "/outlook",  label: "Outlook" },
   { href: "/settings", label: "Settings" },
 ];
 
