@@ -5,11 +5,11 @@ import { simpleParser } from "mailparser";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 export const preferredRegion = ["icn1", "nrt1", "sin1"]; // Seoul → Tokyo → Singapore (Korean mail servers)
 
-const CONNECT_TIMEOUT = 8_000;
-const READ_TIMEOUT = 8_000;
+const CONNECT_TIMEOUT = 25_000;
+const READ_TIMEOUT = 25_000;
 
 function tcpConnect(host: string, port: number, ssl: boolean): Promise<net.Socket> {
   return new Promise((resolve, reject) => {

@@ -402,11 +402,14 @@ async function fetchWebmailPage(
       hasMore?: boolean;
       sessionCookie?: string;
       error?: string;
-      _debug?: { htmlLen?: number; rowIdCount?: number; firstUid?: string; lastUid?: string; mailbox?: string; page?: number };
+      _debug?: { htmlLen?: number; rowIdCount?: number; firstUid?: string; lastUid?: string; mailbox?: string; page?: number; sampleHtml?: string };
     };
     if (data._debug) {
       const d = data._debug;
       console.log(`[fetchWebmailPage debug] folder=${folder} page=${page} htmlLen=${d.htmlLen} rowIdCount=${d.rowIdCount} firstUid=${d.firstUid} lastUid=${d.lastUid} mailbox=${d.mailbox}`);
+      if (d.sampleHtml) {
+        console.log(`[fetchWebmailPage SAMPLE folder=${folder} page=${page}]: ${d.sampleHtml}`);
+      }
     }
     if (data?.error) {
       console.error(`[fetchWebmailPage] folder=${folder} page=${page} server error:`, data.error);
