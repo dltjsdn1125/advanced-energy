@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
       console.log(`[WEBMAIL] single-page mode page=${pageParam} got=${msgs.length}`);
       return NextResponse.json({
         messages: msgs,
-        hasMore: msgs.length >= PAGE_SIZE,
+        hasMore: msgs.length > 0,
         sessionCookie: cookie,
       });
     }
