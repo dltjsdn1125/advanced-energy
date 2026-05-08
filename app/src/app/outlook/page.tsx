@@ -402,14 +402,24 @@ async function fetchWebmailPage(
       hasMore?: boolean;
       sessionCookie?: string;
       error?: string;
+      _debug?: { htmlLen?: number; rowIdCount?: number; mailbox?: string; page?: number };
     };
-    if (data?.error) throw new Error(String(data.error).replace(/^Error:\s*/i, ""));
+    if (data._debug) {
+      console.log(`[fetchWebmailPage debug]`, data._debug);
+    }
+    if (data?.error) {
+      console.error(`[fetchWebmailPage] folder=${folder} page=${page} server error:`, data.error);
+      throw new Error(String(data.error).replace(/^Error:\s*/i, ""));
+    }
+    const msgs = data.messages ?? [];
+    console.log(`[fetchWebmailPage] folder=${folder} page=${page} returned=${msgs.length} hasMore=${data.hasMore} status=${res.status}`);
     return {
-      messages: data.messages ?? [],
+      messages: msgs,
       hasMore:  data.hasMore  ?? false,
       sessionCookie: data.sessionCookie ?? "",
     };
   } catch (e) {
+    console.error(`[fetchWebmailPage] folder=${folder} page=${page} threw:`, e);
     throw e; // propagate to caller for connError collection
   }
 }

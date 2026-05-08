@@ -187,11 +187,14 @@ export async function POST(request: NextRequest) {
       }
 
       const msgs = parseMailList(html, mailbox);
-      console.log(`[WEBMAIL] single-page mode page=${pageParam} got=${msgs.length}`);
+      const rowIdMatches = html.match(/id=["']row_id_\d+["']/g);
+      const rowIdCount = rowIdMatches ? rowIdMatches.length : 0;
+      console.log(`[WEBMAIL] single-page mode page=${pageParam} got=${msgs.length} rowIdCount=${rowIdCount} htmlLen=${html.length}`);
       return NextResponse.json({
         messages: msgs,
         hasMore: msgs.length > 0,
         sessionCookie: cookie,
+        _debug: { htmlLen: html.length, rowIdCount, mailbox, page: pageParam },
       });
     }
 
