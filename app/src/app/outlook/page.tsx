@@ -322,7 +322,10 @@ async function tryImapFetch(limit: number): Promise<OutlookMessage[] | null> {
   return callMailApi("/api/imap/messages", { host, port, ssl, user, pass, limit }, "IMAP");
 }
 
-// ── POP3 fallback: returns null if no POP3 settings ──────────────────────────
+// ── POP3 fallback: paginates internally to bypass Vercel's 60s function cap.
+// Each /api/pop3/messages call fetches at most 100 mails (one round-trip per
+// mail is too slow over Vercel→Korea to fit more in 60s). We loop with
+// increasing offset until the server signals hasMore=false.
 async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
   const raw = localStorage.getItem("ae_settings_v1");
   if (!raw) return null;
@@ -333,8 +336,46 @@ async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
   const user = String(cfg.popUser ?? "");
   const pass = String(cfg.popPass ?? "");
   if (!host || !user || !pass) return null;
-  return callMailApi("/api/pop3/messages", { host, port, ssl, user, pass, limit }, "POP3");
+
+  const PER_CALL = 100;
+  const all: OutlookMessage[] = [];
+  let offset = 0;
+  while (all.length < limit) {
+    try {
+      const res = await fetch("/api/pop3/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ host, port, ssl, user, pass, limit: PER_CALL, offset }),
+      });
+      if (!res.ok) {
+        if (offset === 0) throw new Error(`POP3 ${res.status}`);
+        // Already got some mails — stop on partial failure
+        console.warn(`[POP3 paginate] partial — stopping at ${all.length} mails (status ${res.status})`);
+        break;
+      }
+      const data = await res.json() as {
+        messages?: OutlookMessage[];
+        total?: number;
+        hasMore?: boolean;
+        nextOffset?: number | null;
+        error?: string;
+      };
+      if (data.error) throw new Error(data.error);
+      const batch = data.messages ?? [];
+      all.push(...batch);
+      console.log(`[POP3 paginate] offset=${offset} got=${batch.length} total=${data.total} runningTotal=${all.length}`);
+      if (!data.hasMore || batch.length === 0) break;
+      offset = data.nextOffset ?? offset + PER_CALL;
+      if (all.length >= (data.total ?? 0)) break;
+    } catch (e) {
+      if (all.length === 0) throw e;
+      console.warn("[POP3 paginate] error after partial fetch — returning what we have:", e);
+      break;
+    }
+  }
+  return all;
 }
+
 
 // ── Webmail (MAILNARA) fallback: uses POP3 host/user/pass via HTTPS ───────────
 async function tryWebmailFetch(folder = "inbox"): Promise<OutlookMessage[] | null> {

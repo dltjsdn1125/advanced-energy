@@ -89,7 +89,12 @@ export async function POST(request: NextRequest) {
   const ssl    = body.ssl !== false && body.ssl !== "false";
   const user   = String(body.user ?? "");
   const pass   = String(body.pass ?? "");
-  const limit  = Math.min(Number(body.limit) || 50, 2000);
+  // Cap at 100 — POP3 needs one round trip per message and Vercel→Korea
+  // latency makes anything above ~120 mails per call risk a 504 timeout.
+  const limit  = Math.min(Number(body.limit) || 50, 100);
+  // Optional offset: skip the first N latest mails (so we can paginate
+  // backwards through the inbox over multiple calls). offset=0 → newest 100.
+  const offset = Math.max(0, Number(body.offset) || 0);
 
   if (!host || !user || !pass) {
     return NextResponse.json({ error: "POP3 설정이 필요합니다 (host, user, pass)" }, { status: 400 });
@@ -159,9 +164,14 @@ export async function POST(request: NextRequest) {
     console.log(`[POP3] authenticated. total=${total}`);
 
     const messages: unknown[] = [];
-    const fetchCount = Math.min(limit, total);
+    // Pagination via offset: offset=0 → newest `limit`, offset=100 → next 100, ...
+    const startMsg = total - offset;             // top index for this slice
+    const endMsg   = Math.max(1, startMsg - limit + 1); // bottom index
+    const fetchCount = Math.max(0, startMsg - endMsg + 1);
+    const hasMore = startMsg - limit > 0;
+    console.log(`[POP3] total=${total} offset=${offset} fetching msg ${startMsg}..${endMsg} (count=${fetchCount}) hasMore=${hasMore}`);
 
-    for (let i = total; i > total - fetchCount && i >= 1; i--) {
+    for (let i = startMsg; i >= endMsg && i >= 1; i--) {
       try {
         const topResp = await session.cmd(`TOP ${i} 5`);
         let rawLines: string[];
@@ -202,8 +212,10 @@ export async function POST(request: NextRequest) {
     try { await session.cmd("QUIT"); } catch {}
     session.destroy();
 
-    console.log(`[POP3] done. returned ${messages.length} messages`);
-    return NextResponse.json(messages);
+    console.log(`[POP3] done. returned ${messages.length} messages (hasMore=${hasMore})`);
+    // Return as object so the caller can read pagination metadata. Older
+    // callers passing no offset still get a list-like response via .messages.
+    return NextResponse.json({ messages, total, hasMore, nextOffset: hasMore ? offset + limit : null });
   } catch (e: unknown) {
     const msg = String(e);
     console.error(`[POP3] FAILED host=${host} port=${port} ssl=${ssl}:`, msg);
