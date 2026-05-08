@@ -25,9 +25,9 @@ async function trySend(opts: SendOpts, port: number): Promise<{ ok: boolean; err
     requireTLS: opts.ssl && port !== 465,
     auth: { user: opts.user, pass: opts.pass },
     tls: { rejectUnauthorized: false },
-    connectionTimeout: 15_000,
-    greetingTimeout: 15_000,
-    socketTimeout: 20_000,
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 12_000,
   });
   try {
     await transporter.sendMail({
@@ -41,6 +41,15 @@ async function trySend(opts: SendOpts, port: number): Promise<{ ok: boolean; err
   } catch (e: unknown) {
     return { ok: false, error: String(e) };
   }
+}
+
+// IP-policy / authentication errors that no other port can fix.
+function isFatalAuthError(err: string): boolean {
+  return /5\.8\.1/.test(err)
+    || /ip is not possible/i.test(err)
+    || /authentication.*not.*possible/i.test(err)
+    || /relay.*denied/i.test(err)
+    || /not allowed/i.test(err);
 }
 
 export async function POST(request: NextRequest) {
@@ -66,6 +75,9 @@ export async function POST(request: NextRequest) {
 
   // Try the configured port first, then alternates. Some hosts whitelist
   // certain submission ports differently (e.g. 587 IP-restricted but 465 not).
+  // CRITICAL: stop early on IP-policy errors so we always finish before
+  // Vercel's 30s function cap and return a JSON error (not Vercel's HTML
+  // timeout page that breaks client-side JSON.parse).
   const portsToTry = Array.from(new Set([opts.smtpPort, 587, 465, 25, 2525]));
   let lastErr = "";
   for (const port of portsToTry) {
@@ -73,15 +85,17 @@ export async function POST(request: NextRequest) {
     if (r.ok) return NextResponse.json({ ok: true, port });
     lastErr = r.error ?? "unknown error";
     console.log(`[MAIL-SEND] port ${port} failed: ${lastErr}`);
-    // If error is IP-policy 5.8.1 the other ports almost certainly fail too,
-    // but still try them — some hosts have one open port for relay.
+    if (isFatalAuthError(lastErr)) {
+      console.log(`[MAIL-SEND] fatal auth error — skipping remaining ports`);
+      break;
+    }
   }
 
   return NextResponse.json(
     {
       error: lastErr,
-      hint: lastErr.includes("5.8.1") || lastErr.toLowerCase().includes("ip is not possible")
-        ? "메일 호스팅에서 SMTP 인증을 IP로 제한하고 있습니다. 호스팅 관리자에게 'SMTP relay IP 제한 해제'를 요청하세요."
+      hint: isFatalAuthError(lastErr)
+        ? "메일 호스팅에서 SMTP 인증을 IP로 제한하고 있습니다. 평소엔 차단되어 있고 해외 출장시에만 임시 열린다고 합니다. 발송이 필요하시면 호스팅 관리자에게 IP 허용을 요청하세요."
         : undefined,
     },
     { status: 500 },
