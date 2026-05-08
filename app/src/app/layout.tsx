@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   description:
     "Searchable index of the Advanced Energy Embedded Power Catalogue 2026 — AC-DC / DC-DC power conversion solutions.",
   icons: {
-    icon: "/Semigate.png",
-    shortcut: "/Semigate.png",
-    apple: "/Semigate.png",
+    icon: "/semigate-logo.png",
+    shortcut: "/semigate-logo.png",
+    apple: "/semigate-logo.png",
   },
 };
 
