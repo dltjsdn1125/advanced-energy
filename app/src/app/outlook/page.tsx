@@ -341,9 +341,9 @@ async function tryWebmailFetch(folder = "inbox"): Promise<OutlookMessage[] | nul
   const raw = localStorage.getItem("ae_settings_v1");
   if (!raw) return null;
   const cfg  = JSON.parse(raw) as Record<string, unknown>;
-  const host = String(cfg.popHost ?? "");
-  const user = String(cfg.popUser ?? "");
-  const pass = String(cfg.popPass ?? "");
+  const host = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
+  const user = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
+  const pass = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
   if (!host || !user || !pass) return null;
   return callMailApi("/api/webmail/messages", { host, user, pass, folder }, "Webmail");
 }
@@ -380,9 +380,10 @@ async function fetchWebmailPage(
     const raw = localStorage.getItem("ae_settings_v1");
     if (!raw) return null;
     const cfg  = JSON.parse(raw) as Record<string, unknown>;
-    const host = String(cfg.popHost ?? "");
-    const user = String(cfg.popUser ?? "");
-    const pass = String(cfg.popPass ?? "");
+    // Prefer POP3 credentials; fall back to IMAP (same MAILNARA server address)
+    const host = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
+    const user = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
+    const pass = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
     if (!host || !user || !pass) return null;
     const res = await fetch("/api/webmail/messages", {
       method: "POST",
@@ -870,9 +871,9 @@ export default function OutlookPage() {
       const raw = localStorage.getItem("ae_settings_v1");
       if (raw) {
         const cfg = JSON.parse(raw) as Record<string, unknown>;
-        const popHost = String(cfg.popHost ?? "");
-        const popUser = String(cfg.popUser ?? "");
-        const popPass = String(cfg.popPass ?? "");
+        const popHost = String(cfg.popHost ?? "") || String(cfg.imapHost ?? "");
+        const popUser = String(cfg.popUser ?? "") || String(cfg.imapUser ?? "");
+        const popPass = String(cfg.popPass ?? "") || String(cfg.imapPass ?? "");
         if (popHost && popUser && popPass) {
           const currentProto = localStorage.getItem(PROTO_KEY) ?? "";
           // Check if cached inbox messages look like non-webmail (no "web-" prefix)
@@ -1000,9 +1001,9 @@ export default function OutlookPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            host:          String(cfg.popHost        ?? ""),
-            user:          String(cfg.popUser        ?? ""),
-            pass:          String(cfg.popPass        ?? ""),
+            host:          String(cfg.popHost ?? "") || String(cfg.imapHost ?? ""),
+            user:          String(cfg.popUser ?? "") || String(cfg.imapUser ?? ""),
+            pass:          String(cfg.popPass ?? "") || String(cfg.imapPass ?? ""),
             sessionCookie: getWebmailSession(),
             uid,
             mailbox,
@@ -1299,7 +1300,7 @@ export default function OutlookPage() {
         res = await fetch("/api/webmail/delete", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ host: cfg.popHost, user: cfg.popUser, pass: cfg.popPass, sessionCookie: getWebmailSession(), entryId: msg.entryId, permanent }),
+          body: JSON.stringify({ host: String(cfg.popHost ?? "") || String(cfg.imapHost ?? ""), user: String(cfg.popUser ?? "") || String(cfg.imapUser ?? ""), pass: String(cfg.popPass ?? "") || String(cfg.imapPass ?? ""), sessionCookie: getWebmailSession(), entryId: msg.entryId, permanent }),
         });
       } else {
         res = await fetch("/api/outlook/delete", {
@@ -1360,7 +1361,7 @@ export default function OutlookPage() {
             return fetch("/api/webmail/delete", {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ host: cfg.popHost, user: cfg.popUser, pass: cfg.popPass, sessionCookie: getWebmailSession(), entryId, permanent }),
+              body: JSON.stringify({ host: String(cfg.popHost ?? "") || String(cfg.imapHost ?? ""), user: String(cfg.popUser ?? "") || String(cfg.imapUser ?? ""), pass: String(cfg.popPass ?? "") || String(cfg.imapPass ?? ""), sessionCookie: getWebmailSession(), entryId, permanent }),
             });
           }
           return fetch("/api/outlook/delete", {
