@@ -219,13 +219,28 @@ function parseAttachmentsFromHtml(html: string): AttachmentMeta[] {
     // MAILNARA-specific endpoint name. External http(s)://other-site/file.pdf
     // is rejected outright — those are inline links in the email body, not
     // server-stored attachments we can proxy via session cookie.
-    const isRelativeOrAbsoluteSamePath =
-      href.startsWith("/") ||
-      href.startsWith("?") ||
-      (!/^https?:/i.test(href) && !/^javascript:/i.test(href) && !/^mailto:/i.test(href));
+    if (/^javascript:/i.test(href) || /^mailto:/i.test(href) || /^#/.test(href)) continue;
+    const isExternalUrl = /^https?:\/\//i.test(href);
+    const isRelativePath = !isExternalUrl;
+    // MAILNARA download endpoint signatures we know about.
+    // The actual format on this install is `/mail/file_download.php?...&disposition=attachment`.
     const hrefHasMailnaraDownloadEndpoint =
-      /(?:\/|\b)(?:maildownload|mail_attach|mail_download|file_down|attach_download|download)(?:[\/\?]|\.php|$)/i.test(href);
-    if (!isRelativeOrAbsoluteSamePath && !hrefHasMailnaraDownloadEndpoint) continue;
+      /file_download/i.test(href) ||              // /mail/file_download.php
+      /maildownload/i.test(href) ||
+      /mail_attach/i.test(href) ||
+      /mail_download/i.test(href) ||
+      /attach_download/i.test(href) ||
+      /[?&]disposition=attachment/i.test(href) || // explicit MIME disposition param
+      /\/mail\/.*download/i.test(href);            // generic /mail/...download...
+    if (isExternalUrl) continue; // never accept external absolute URLs
+    if (isRelativePath && !hrefHasMailnaraDownloadEndpoint) {
+      // Relative link without a recognized download keyword — skip.
+      // Accept only if link text has a filename pattern AND href contains
+      // 'mail' somewhere (likely on MAILNARA).
+      const looksLikeFilename = /\.[a-z0-9]{1,5}\b/i.test(inner) && inner.length < 150;
+      const looksLikeMailUrl = /\/mail\b/i.test(href) || /\bmailbox=/i.test(href) || /\buid=/i.test(href);
+      if (!(looksLikeFilename && looksLikeMailUrl)) continue;
+    }
 
     const sm = inner.match(/^(.+?)\s*[\(（]\s*([\d.,]+\s*(?:KB|MB|GB|byte|bytes|B)?)\s*[\)）]\s*$/i);
     const name = tryDecodeURI(sm ? sm[1].trim() : inner);
