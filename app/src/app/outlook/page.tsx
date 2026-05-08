@@ -425,6 +425,10 @@ export default function OutlookPage() {
   const [threadLoading, setThreadLoading] = useState(false);
   const [checkedIds,    setCheckedIds]    = useState<Set<string>>(new Set());
   const [bulkDeleting,  setBulkDeleting]  = useState(false);
+
+  // Custom confirm/alert dialogs (replace native window.confirm / alert)
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
+  const [alertDialog,   setAlertDialog]   = useState<string | null>(null);
   const [iframeH,       setIframeH]       = useState<Record<number, number>>({});
   const [iframeW,       setIframeW]       = useState<Record<number, number>>({});
 
@@ -476,6 +480,7 @@ export default function OutlookPage() {
   const [composeCcStr,   setComposeCcStr]   = useState("");
   const [composeBody,    setComposeBody]    = useState("");
   const [composeSending, setComposeSending] = useState(false);
+  const [composeQuoteH,  setComposeQuoteH]  = useState(200);
   const [sendSuccess,    setSendSuccess]    = useState(false);
   const [sendSuccessOut, setSendSuccessOut] = useState(false);
 
@@ -751,7 +756,7 @@ export default function OutlookPage() {
         let mailMsgs: OutlookMessage[] | null = null;
         let connError = "";
 
-        if (folder === "inbox" || folder === "sent") {
+        if ((folder === "inbox" || folder === "sent") && mailProto !== "webmail") {
           // 1) IMAP
           const imapResult = await tryImapFetch(200).then(m => ({ ok: m })).catch(e => ({ err: String(e) }));
           if ("ok" in imapResult && imapResult.ok !== null) {
@@ -842,13 +847,27 @@ export default function OutlookPage() {
     }
 
     loadMessages("inbox").then(() => {
-      // Prefetch all other folders in parallel (short delay to not block inbox render)
-      setTimeout(() => {
-        for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
-          fetch(`/api/outlook/messages?folder=${f}`)
-            .then(r => r.json())
-            .then(data => { if (Array.isArray(data)) setFolderCache(f, data); })
-            .catch(() => {});
+      // Prefetch all other folders after inbox loads — use webmail API when applicable
+      setTimeout(async () => {
+        const proto = localStorage.getItem(PROTO_KEY) ?? "";
+        if (proto === "webmail") {
+          for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
+            try {
+              const session = getWebmailSession();
+              const result  = await fetchWebmailPage(f, 0, session);
+              if (result) {
+                saveWebmailSession(result.sessionCookie);
+                setFolderCache(f, result.messages);
+              }
+            } catch {}
+          }
+        } else {
+          for (const f of ["sent", "drafts", "deleted", "junk"] as Folder[]) {
+            fetch(`/api/outlook/messages?folder=${f}`)
+              .then(r => r.json())
+              .then(data => { if (Array.isArray(data)) setFolderCache(f, data); })
+              .catch(() => {});
+          }
         }
       }, 500);
     });
@@ -1153,6 +1172,7 @@ export default function OutlookPage() {
     setReplyAction(action);
     setComposeBody("");
     setReplyStatus("");
+    setComposeQuoteH(200);
 
     const latest = thread[thread.length - 1];
     const me = senderEmail.toLowerCase().trim();
@@ -1213,20 +1233,34 @@ export default function OutlookPage() {
     }
   }
 
+  function showConfirm(message: string): Promise<boolean> {
+    return new Promise(resolve => setConfirmDialog({ message, resolve }));
+  }
+  function showAlert(message: string) { setAlertDialog(message); }
+
   async function deleteMessage(msg: OutlookMessage) {
-    const ok = window.confirm(
-      activeFolder === "deleted"
-        ? "이 메일을 영구 삭제할까요?"
-        : "이 메일을 삭제할까요? (지운 편지함으로 이동)",
+    const permanent = activeFolder === "deleted";
+    const ok = await showConfirm(
+      permanent ? "이 메일을 영구 삭제할까요?" : "이 메일을 삭제할까요? (지운 편지함으로 이동)",
     );
     if (!ok) return;
 
     try {
-      const res = await fetch("/api/outlook/delete", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ entryId: msg.entryId }),
-      });
+      let res: Response;
+      if (msg.entryId.startsWith("web-")) {
+        const cfg = JSON.parse(localStorage.getItem("ae_settings_v1") ?? "{}") as Record<string, unknown>;
+        res = await fetch("/api/webmail/delete", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ host: cfg.popHost, user: cfg.popUser, pass: cfg.popPass, entryId: msg.entryId, permanent }),
+        });
+      } else {
+        res = await fetch("/api/outlook/delete", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ entryId: msg.entryId }),
+        });
+      }
       const data = await res.json();
       if (data?.error) throw new Error(data.error);
 
@@ -1256,14 +1290,14 @@ export default function OutlookPage() {
         setDraft("");
       }
     } catch (e: unknown) {
-      alert(`삭제 실패: ${String(e)}`);
+      showAlert(`삭제 실패: ${String(e)}`);
     }
   }
 
   async function bulkDelete(ids: string[]) {
     if (ids.length === 0) return;
     const permanent = activeFolder === "deleted";
-    const ok = window.confirm(
+    const ok = await showConfirm(
       permanent
         ? `선택된 메일 ${ids.length}건을 영구 삭제할까요?`
         : `선택된 메일 ${ids.length}건을 삭제할까요? (지운 편지함으로 이동)`,
@@ -1272,14 +1306,22 @@ export default function OutlookPage() {
     setBulkDeleting(true);
     const idSet = new Set(ids);
     try {
+      const cfg = JSON.parse(localStorage.getItem("ae_settings_v1") ?? "{}") as Record<string, unknown>;
       await Promise.all(
-        ids.map(entryId =>
-          fetch("/api/outlook/delete", {
+        ids.map(entryId => {
+          if (entryId.startsWith("web-")) {
+            return fetch("/api/webmail/delete", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ host: cfg.popHost, user: cfg.popUser, pass: cfg.popPass, entryId, permanent }),
+            });
+          }
+          return fetch("/api/outlook/delete", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ entryId }),
-          }),
-        ),
+          });
+        }),
       );
       setMessages(prev => prev.filter(m => !idSet.has(m.entryId)));
       for (const f of ["inbox", "sent", "drafts", "junk", "deleted", activeFolder] as Folder[]) {
@@ -1301,7 +1343,7 @@ export default function OutlookPage() {
       }
       setCheckedIds(new Set());
     } catch (e: unknown) {
-      alert(`일괄 삭제 실패: ${String(e)}`);
+      showAlert(`일괄 삭제 실패: ${String(e)}`);
     } finally {
       setBulkDeleting(false);
     }
@@ -2336,30 +2378,74 @@ export default function OutlookPage() {
             placeholder={replyAction === "forward" ? "Enter forwarding message…" : "Enter reply…"}
             className="min-h-[120px] flex-1 resize-none bg-white px-4 py-3 text-[12px] leading-relaxed text-ink-800 focus:outline-none placeholder:text-ink-300"
           />
-          {/* Quoted original email */}
+          {/* Quoted thread history */}
           {(() => {
-            const latest = thread[thread.length - 1];
             if (!selected) return null;
-            const senderDisplay = (latest?.senderName ?? selected.senderName) +
-              " &lt;" + (latest?.senderEmail ?? selected.senderEmail) + "&gt;";
-            const dateStr = formatDate(latest?.sentOn ?? selected.receivedTime);
-            const toRecips = (latest?.recipients ?? [])
-              .filter(r => r.rtype === 1).map(r => r.name || r.email).join("; ");
-            const subjectStr = (selected.subject ?? "").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-            let bodyHtml = "";
-            if (latest?.htmlBody) {
-              bodyHtml = latest.htmlBody;
-            } else if (latest?.body) {
-              bodyHtml = `<pre style="white-space:pre-wrap;font-size:11px;font-family:Calibri,Arial,sans-serif;margin:0">${latest.body.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre>`;
-            }
-            const label = replyAction === "forward" ? "전달된 메시지" : "원본 메시지";
-            const srcDoc = `<!DOCTYPE html><html><head><style>*{box-sizing:border-box}html,body{margin:0;padding:0;overflow:hidden}body{font-family:Calibri,Arial,sans-serif;font-size:11px;color:#333;padding:8px 12px}.hdr{color:#666;font-size:11px;padding-bottom:6px;border-bottom:1px solid #e0e0e0;margin-bottom:8px}.hdr b{color:#555}</style></head><body><div class="hdr"><b>----- ${label} -----</b><br/><b>보낸 사람:</b> ${senderDisplay}<br/><b>보낸 날짜:</b> ${dateStr}<br/>${toRecips ? `<b>받는 사람:</b> ${toRecips}<br/>` : ""}<b>제목:</b> ${subjectStr}</div>${bodyHtml}</body></html>`;
+            if (threadLoading) return (
+              <div className="shrink-0 border-t border-ink-100 flex items-center justify-center" style={{ height: 60 }}>
+                <span className="text-[11px] text-ink-400">원본 메일 불러오는 중…</span>
+              </div>
+            );
+            if (thread.length === 0) return null;
+
+            // Build quoted HTML from ALL thread messages (newest first = reversed)
+            const msgs = [...thread].reverse();
+            const partsHtml = msgs.map((msg, idx) => {
+              // Extract body content only (skip injected <head> styles that have overflow:hidden)
+              let bodyContent = "";
+              if (msg.htmlBody) {
+                const m = msg.htmlBody.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                bodyContent = m ? m[1] : msg.htmlBody;
+              } else if (msg.body) {
+                bodyContent = `<pre style="white-space:pre-wrap;font-family:Calibri,Arial,sans-serif;font-size:11px;margin:0">${msg.body.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre>`;
+              }
+              const senderDisp = msg.senderName
+                ? `${msg.senderName} &lt;${msg.senderEmail}&gt;`
+                : msg.senderEmail;
+              const dateStr = formatDate(msg.sentOn ?? "");
+              const toRecips = msg.recipients.filter(r => r.rtype === 1).map(r => r.name || r.email).join("; ");
+              const subjStr  = (msg.subject ?? "").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+              const label    = idx === 0
+                ? (replyAction === "forward" ? "전달된 메시지" : "원본 메시지")
+                : "이전 메시지";
+              return `<div style="padding:10px 0;${idx > 0 ? "border-top:1px solid #ddd;margin-top:8px" : ""}">
+                <div style="background:#f5f5f5;padding:6px 10px;border-radius:3px;margin-bottom:8px;font-size:11px;color:#555;line-height:1.6">
+                  <b>----- ${label} -----</b><br/>
+                  <b>보낸 사람:</b> ${senderDisp}<br/>
+                  <b>보낸 날짜:</b> ${dateStr}<br/>
+                  ${toRecips ? `<b>받는 사람:</b> ${toRecips}<br/>` : ""}
+                  <b>제목:</b> ${subjStr}
+                </div>
+                ${bodyContent}
+              </div>`;
+            }).join("");
+
+            const srcDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+              *{box-sizing:border-box}
+              html,body{margin:0;padding:0;overflow-y:auto!important;overflow-x:hidden}
+              body{font-family:'고운돋움','Goun Dotum',Calibri,Arial,sans-serif;font-size:12px;color:#333;padding:8px 12px}
+              img{max-width:100%!important;height:auto!important}
+            </style></head><body>${partsHtml}</body></html>`;
+
             return (
-              <div className="shrink-0 border-t border-ink-100" style={{ height: 180 }}>
-                {threadLoading
-                  ? <div className="flex h-full items-center justify-center text-[11px] text-ink-400">원본 메일 불러오는 중…</div>
-                  : <iframe srcDoc={srcDoc} sandbox="allow-same-origin" className="w-full border-none" style={{ height: 180 }}/>
-                }
+              <div className="shrink-0 border-t border-ink-100" style={{ height: composeQuoteH }}>
+                <iframe
+                  srcDoc={srcDoc}
+                  sandbox="allow-same-origin"
+                  className="w-full border-none"
+                  style={{ height: composeQuoteH }}
+                  onLoad={e => {
+                    try {
+                      const doc = e.currentTarget.contentDocument;
+                      const h = Math.max(
+                        doc?.documentElement?.scrollHeight ?? 0,
+                        doc?.body?.scrollHeight ?? 0,
+                        80,
+                      ) + 24;
+                      setComposeQuoteH(Math.min(h, 450));
+                    } catch {}
+                  }}
+                />
               </div>
             );
           })()}
@@ -3370,6 +3456,47 @@ export default function OutlookPage() {
           )}
         </div>
       </div>
+
+      {/* ── Custom Confirm Dialog ─────────────────────────────────────────── */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-[360px] rounded-xl border border-ink-200 bg-white shadow-2xl">
+            <div className="px-5 pt-5 pb-3">
+              <p className="text-[14px] text-ink-800 whitespace-pre-wrap leading-relaxed">{confirmDialog.message}</p>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-ink-100 px-5 py-3">
+              <button
+                onClick={() => { confirmDialog.resolve(false); setConfirmDialog(null); }}
+                className="rounded border border-ink-200 px-4 py-1.5 text-[13px] text-ink-600 hover:bg-ink-50">
+                취소
+              </button>
+              <button
+                onClick={() => { confirmDialog.resolve(true); setConfirmDialog(null); }}
+                className="rounded bg-red-500 px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-red-600">
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Custom Alert Dialog ───────────────────────────────────────────── */}
+      {alertDialog !== null && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-[360px] rounded-xl border border-ink-200 bg-white shadow-2xl">
+            <div className="px-5 pt-5 pb-3">
+              <p className="text-[14px] text-ink-800 whitespace-pre-wrap leading-relaxed">{alertDialog}</p>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-ink-100 px-5 py-3">
+              <button
+                onClick={() => setAlertDialog(null)}
+                className="rounded bg-[#0f3460] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0a2342]">
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
