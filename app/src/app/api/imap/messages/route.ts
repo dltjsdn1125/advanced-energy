@@ -3,7 +3,7 @@ import { ImapFlow } from "imapflow";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 export const preferredRegion = ["icn1", "nrt1", "sin1"]; // Seoul → Tokyo → Singapore (Korean mail servers)
 
 export async function POST(request: NextRequest) {
@@ -28,9 +28,9 @@ export async function POST(request: NextRequest) {
     auth: { user, pass },
     logger: false,
     tls: { rejectUnauthorized: false },
-    connectionTimeout: 8000,
-    greetingTimeout: 8000,
-    socketTimeout: 8000,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 50_000,
   });
 
   try {
@@ -47,13 +47,12 @@ export async function POST(request: NextRequest) {
       const fetchCount = Math.min(limit, total);
       const start = Math.max(1, total - fetchCount + 1);
 
+      // Envelope-only fetch (no body) — 10-100x faster than including bodyParts.
+      // Preview/body is fetched on-demand when the user opens a message.
       for await (const msg of client.fetch(`${start}:${total}`, {
         uid: true,
         flags: true,
         envelope: true,
-        bodyStructure: true,
-        bodyParts: ["text", "1"],
-        size: true,
       })) {
         try {
           const env = msg.envelope;
@@ -62,15 +61,6 @@ export async function POST(request: NextRequest) {
           const date = env?.date ?? null;
           const isUnread = !msg.flags?.has("\\Seen");
 
-          let preview = "";
-          if (msg.bodyParts?.size) {
-            const part = msg.bodyParts.get("text") ?? msg.bodyParts.get("1");
-            if (part) {
-              const buf = Buffer.isBuffer(part) ? part : Buffer.from(part as string, "binary");
-              preview = buf.toString("utf8").slice(0, 130).replace(/[\r\n\t ]+/g, " ").trim();
-            }
-          }
-
           messages.push({
             entryId:        `imap-${msg.uid}`,
             conversationId: env?.messageId ?? `imap-${msg.uid}`,
@@ -78,7 +68,7 @@ export async function POST(request: NextRequest) {
             senderName:  from?.name ?? from?.address ?? "",
             senderEmail: from?.address ?? "",
             receivedTime: date ? date.toISOString() : "",
-            preview,
+            preview:        "",
             isUnread,
             isToMe: false,
             attachmentCount: 0,
