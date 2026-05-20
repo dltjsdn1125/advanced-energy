@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { apiFetch, getToken } from "@/lib/api";
+import { mailApi } from "@/lib/mailRelay";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface OutlookMessage {
@@ -342,7 +343,7 @@ async function tryPop3Fetch(limit: number): Promise<OutlookMessage[] | null> {
   let offset = 0;
   while (all.length < limit) {
     try {
-      const res = await fetch("/api/pop3/messages", {
+      const res = await fetch(mailApi("/api/pop3/messages"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ host, port, ssl, user, pass, limit: PER_CALL, offset }),
@@ -433,7 +434,7 @@ async function fetchWebmailPage(
       return null;
     }
     console.log(`[fetchWebmailPage] folder=${folder} page=${page} host=${host} user=${user}`);
-    const res = await fetch("/api/webmail/messages", {
+    const res = await fetch(mailApi("/api/webmail/messages"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ host, user, pass, folder, page, sessionCookie }),
@@ -1239,7 +1240,7 @@ export default function OutlookPage() {
         const uid     = colonIdx >= 0 ? raw2.slice(colonIdx + 1) : raw2;
         const raw = localStorage.getItem("ae_settings_v1");
         const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
-        const res = await fetch("/api/webmail/thread", {
+        const res = await fetch(mailApi("/api/webmail/thread"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1313,7 +1314,7 @@ export default function OutlookPage() {
       try {
         const raw = localStorage.getItem("ae_settings_v1");
         const cfg = raw ? JSON.parse(raw) as Record<string, unknown> : {};
-        const res = await fetch("/api/webmail/attachment", {
+        const res = await fetch(mailApi("/api/webmail/attachment"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1494,7 +1495,7 @@ export default function OutlookPage() {
     if (!smtpHost || !user || !pass) {
       throw new Error("SMTP 설정이 필요합니다 (설정 → SMTP/IMAP).");
     }
-    const res = await fetch("/api/mail/send", {
+    const res = await fetch(mailApi("/api/mail/send"), {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
         smtpHost, smtpPort, ssl, user, pass,
@@ -1720,7 +1721,7 @@ export default function OutlookPage() {
         html = userBodyHtml;
       }
 
-      const res = await fetch("/api/mail/send", {
+      const res = await fetch(mailApi("/api/mail/send"), {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
           smtpHost, smtpPort, ssl, user, pass,

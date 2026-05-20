@@ -1,0 +1,3 @@
+mail-relay/node_modules/
+mail-relay/dist/
+.env

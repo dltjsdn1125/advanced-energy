@@ -1,0 +1,31 @@
+{
+  "name": "ae-mail-relay",
+  "version": "0.1.0",
+  "description": "Korean-IP mail backend relay for advanced-energy. Bypasses Vercel US-IP blocks by running on Oracle Cloud Chuncheon (or any Korean VPS). Vercel frontend proxies all mail API calls through this service.",
+  "private": true,
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "imapflow": "^1.0.190",
+    "mailparser": "^3.7.4",
+    "nodemailer": "^7.0.10"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.5",
+    "@types/mailparser": "^3.4.6",
+    "@types/node": "^22.10.6",
+    "@types/nodemailer": "^7.0.4",
+    "tsx": "^4.19.4",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
