@@ -925,10 +925,31 @@ export default function OutlookPage() {
       let data: any;
       let connError = "";
 
-      // ── Step 1: Webmail first — guaranteed to return SOMETHING quickly ────
+      // ── Step 0: Outlook COM (local Windows only) — primary on desktop ─────
+      // /api/outlook/messages returns 503 on non-Windows hosts (Vercel, Mac, etc.)
+      // so this auto-cascades to webmail when COM isn't available. On a Windows
+      // PC with Outlook installed, COM returns the user's full local store
+      // (typically 600+ mails) in one shot — far better than webmail's 148-cap.
+      try {
+        const qs  = new URLSearchParams({ folder });
+        const res = await fetch(`/api/outlook/messages?${qs}`);
+        if (res.status !== 503) {
+          const comData = await res.json();
+          if (!comData?.error && Array.isArray(comData) && comData.length > 0) {
+            data = comData;
+            localStorage.setItem(PROTO_KEY, "outlook");
+            fullyLoadedRef.current.add(folder);
+            console.log(`[loadMessages] Outlook COM returned ${comData.length} mails — using as primary`);
+          }
+        }
+      } catch (e) {
+        console.warn("[loadMessages] Outlook COM probe failed (likely non-Windows):", e);
+      }
+
+      // ── Step 1: Webmail fallback when COM unavailable ─────────────────────
       // MAILNARA returns an empty list under concurrent-request load. If we get
       // 0 messages, retry up to 2 times (with brief delays) before giving up.
-      try {
+      if (data === undefined) try {
         let firstPage: WebmailPageResult | null = null;
         for (let attempt = 0; attempt < 3; attempt++) {
           const session = getWebmailSession();
@@ -994,16 +1015,7 @@ export default function OutlookPage() {
         })();
       }
 
-      // ── Step 3: Outlook COM (Windows desktop only) ───────────────────────
-      if (data === undefined) {
-        const qs  = new URLSearchParams({ folder });
-        const res = await fetch(`/api/outlook/messages?${qs}`);
-        const comData = await res.json();
-        if (res.status !== 503 && !comData?.error) {
-          data = comData;
-          localStorage.setItem(PROTO_KEY, "outlook");
-        }
-      }
+      // (Outlook COM was tried as Step 0 already.)
 
       // ── Step 4: POP3 fallback ─────────────────────────────────────────────
       if (data === undefined) {
