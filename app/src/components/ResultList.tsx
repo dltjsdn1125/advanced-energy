@@ -194,29 +194,27 @@ const SPECS = [
   { key: "cert", label: "Cert", Icon: CertIcon, get: certLabel },
 ] as const;
 
-// 모든 카드가 공유하는 스펙 표. 이미지 아래 영역에 연한 회색 실선(2×2 격자)으로
-// 정리한다. 값이 없는 필드는 "—" 로 자리를 유지해 카드 간 정렬을 통일한다.
-function SpecTable({ m, className = "" }: { m: Model; className?: string }) {
+// 모든 카드가 공유하는 스펙 목록 — 테두리 없이 아이콘이 라벨을 대신하는 정렬된
+// 2열 그리드. 아이콘 위치가 항상 Input/Output/Power/Cert 순서로 고정돼 질서를 주고,
+// 값이 없는 필드(주로 인증)는 흐리게 처리해 채워진 스펙이 또렷하게 읽히도록 한다.
+function SpecList({ m, className = "" }: { m: Model; className?: string }) {
   return (
-    <div
-      className={`grid grid-cols-2 overflow-hidden rounded-md border border-ink-200 ${className}`}
-    >
-      {SPECS.map(({ key, label, Icon, get }, i) => {
+    <dl className={`grid grid-cols-2 gap-x-4 gap-y-1 ${className}`}>
+      {SPECS.map(({ key, label, Icon, get }) => {
         const value = get(m);
+        const empty = value === DASH;
         return (
           <div
             key={key}
             title={`${label}: ${value}`}
-            className={`flex min-w-0 items-center gap-1.5 px-2 py-1 ${
-              i % 2 === 0 ? "border-r border-ink-200" : ""
-            } ${i < 2 ? "border-b border-ink-200" : ""}`}
+            className="flex min-w-0 items-center gap-1.5"
           >
-            <span className="shrink-0 text-ink-400">
+            <span className={`shrink-0 ${empty ? "text-ink-200" : "text-ink-400"}`}>
               <Icon />
             </span>
             <span
               className={`mono truncate text-[12px] leading-tight ${
-                value === DASH ? "text-ink-300" : "text-ink-700"
+                empty ? "text-ink-300" : "text-ink-700"
               }`}
             >
               {value}
@@ -224,7 +222,7 @@ function SpecTable({ m, className = "" }: { m: Model; className?: string }) {
           </div>
         );
       })}
-    </div>
+    </dl>
   );
 }
 
@@ -273,7 +271,7 @@ export default function ResultList({
                     </div>
                   </div>
                 </div>
-                <SpecTable m={m} className="w-full" />
+                <SpecList m={m} className="w-full" />
                 <div className="mt-auto flex w-full items-center justify-between text-[12px]">
                   <span className="mono text-ink-500">p.{m.pages[0]}</span>
                   {m.brand && <span className="mono text-ink-500">{m.brand}</span>}
@@ -322,8 +320,8 @@ export default function ResultList({
                   </span>
                 </div>
               </div>
-              {/* 스펙은 이미지 아래 영역에 표로 정리 */}
-              <SpecTable m={m} className="w-full sm:max-w-xl" />
+              {/* 스펙은 이미지 아래 영역에 무테 그리드로 정렬 */}
+              <SpecList m={m} className="w-full sm:max-w-xl" />
             </button>
           </li>
         );
