@@ -11,6 +11,13 @@ import type { Brand, Catalog, Model, OrderingIndex, OrderingTable, SpecIndex, Li
 const CERT_PATTERN =
   /^(EN\d|IEC[\d]|MIL-STD|UL[\d\/]|CSA\d|ISO\d|CE\d{2}|Load\/|ES\d|IPC-\d|IP\d{2}|F\d{2}-|SEMI[\s-]|RS\d{3}|V[-\/]\d|W\/\d)/i;
 
+// ── 추가 노이즈 필터 ──────────────────────────────────────────────────────────
+// PDF 표에서 규격·인증 번호나 값 조각이 모델명으로 잘못 색인된 항목. CERT_PATTERN
+// 이 놓친 것들을 정밀하게 제거한다. 실제 제품(GB10/GB20/GB130Q 등, 4자리 미만
+// 숫자)은 건드리지 않도록 GB 표준은 4자리 이상 숫자만 매칭.
+const NOISE_PATTERN =
+  /^(ES\d{4,}|SR-\d|CAN[\/ ]?CSA|IPC[- ]?\d|F47-|P60\d{2}$|V[-\/]\d|W\/\d|Load\/|End\/|SW-SW|GB\s?\d{4}|GB\/T|VAC\/|CE10\d{2}$)/i;
+
 // ── 유령 MODULAR 항목 필터 ────────────────────────────────────────────────────
 // PDF의 Healthcare/Modular 섹션 표에서 참조(Reference)로 언급된 모델명이
 // 독립 항목으로 잘못 색인되는 경우가 있다.
@@ -325,9 +332,12 @@ export function classifyBrand(
 const rawCatalog = catalogJson as unknown as Catalog;
 const ghostSet = buildGhostSet(rawCatalog.models);
 
-// 1) 인증번호·유령 항목 제거
+// 1) 인증번호·노이즈·유령 항목 제거
 const baseFiltered = rawCatalog.models.filter(
-  (m) => !CERT_PATTERN.test(m.model) && !ghostSet.has(m.model),
+  (m) =>
+    !CERT_PATTERN.test(m.model) &&
+    !NOISE_PATTERN.test(m.model) &&
+    !ghostSet.has(m.model),
 );
 
 // 2) RACKS 재분류 (BULK → RACKS for shelf/rack products)

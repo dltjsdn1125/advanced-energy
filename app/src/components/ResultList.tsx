@@ -80,6 +80,12 @@ function clean(s: string | undefined | null): string {
   return (s ?? "").replace(/\s+/g, " ").trim();
 }
 
+// PDF 추출이 구조화 필드로 못 옮긴 값이 자주 남아있는 원본 텍스트 (예: DC-DC
+// 모듈의 "4.5 to 10 VDC 3.3 V @ 0.6 A (14 x 14 x 8) 79%"). 라벨 폴백에서 파싱한다.
+function specText(m: Model): string {
+  return `${(m.contextLines ?? []).join(" ")} ${m.searchText ?? ""}`;
+}
+
 // ── 카드 공통 스펙 해석 ────────────────────────────────────────────────────────
 // 카드마다 데이터 밀도가 달라 표시가 제각각이던 문제를 없애기 위해, 모든 카드가
 // 동일한 4개 필드(입력·출력·전력·인증)를 같은 순서로 표시한다. 각 값은
@@ -95,6 +101,11 @@ function inputLabel(m: Model): string {
   if (lo && hi) return `${lo}–${hi}${suffix}`;
   if (m.inputVoltageMin != null && m.inputVoltageMax != null)
     return `${m.inputVoltageMin}–${m.inputVoltageMax}${suffix}`;
+  // fallback: 원본 텍스트에서 입력 전압 범위 파싱 (예: "4.5 to 10 VDC")
+  const r = specText(m).match(
+    /(\d+(?:\.\d+)?)\s*(?:to|~|–|-)\s*(\d+(?:\.\d+)?)\s*V\s*(AC|DC)?/i,
+  );
+  if (r) return `${r[1]}–${r[2]} V${(r[3] ?? "").toUpperCase()}`.trim();
   return DASH;
 }
 
@@ -105,6 +116,9 @@ function outputLabel(m: Model): string {
   }
   const s = m.specMap ?? {};
   if (s["Output Voltage Range (V)"]) return clean(s["Output Voltage Range (V)"]);
+  // fallback: "±?N V @ I A" 형태에서 출력 전압 파싱
+  const o = specText(m).match(/(±?\d+(?:\.\d+)?)\s*V\s*@\s*[\d.]+\s*A/i);
+  if (o) return `${o[1]}V`;
   return DASH;
 }
 
@@ -113,7 +127,19 @@ function powerLabel(m: Model): string {
   if (wl) return wl;
   const s = m.specMap ?? {};
   const p = clean(s["Maximum Output Power (W)"] || s["Output Power (W)"]);
-  return p ? `${p} W` : DASH;
+  if (p) return `${p} W`;
+  const t = specText(m);
+  // 명시된 와트값
+  const w = t.match(/(\d+(?:\.\d+)?)\s*(k?W)\b/i);
+  if (w) return `${w[1]}${w[2].toUpperCase()}`;
+  // DC-DC 모듈: 출력전압 × 출력전류 로 전력 산출 (예: 3.3V @ 0.6A → 2 W)
+  const vn = parseFloat((m.outputVolts?.[0] ?? "").replace(/[^\d.]/g, ""));
+  const cm = t.match(/V\s*@\s*([\d.]+)\s*A\b/i);
+  if (Number.isFinite(vn) && vn > 0 && cm) {
+    const watts = vn * parseFloat(cm[1]);
+    if (watts > 0) return watts < 1 ? `${watts.toFixed(1)} W` : `${Math.round(watts)} W`;
+  }
+  return DASH;
 }
 
 // 인증은 데이터가 희소해(≈14%) 원본 텍스트에서 표준/마크 토큰을 추출해 정규화한다.
@@ -145,7 +171,10 @@ function currentLabel(m: Model): string {
   if (m.amps?.length) return m.amps.slice(0, 2).join(" / ");
   const s = m.specMap ?? {};
   const c = clean(s["Maximum Output Current (A)"] || s["최대 출력 전류"]);
-  return c ? `${c} A` : DASH;
+  if (c) return `${c} A`;
+  // fallback: "N V @ I A" 에서 출력 전류 파싱
+  const cm = specText(m).match(/V\s*@\s*([\d.]+)\s*A\b/i);
+  return cm ? `${cm[1]} A` : DASH;
 }
 
 function efficiencyLabel(m: Model): string {
@@ -381,7 +410,7 @@ export default function ResultList({
                 <div className="flex w-full items-center gap-3">
                   <Thumb m={m} active={active} />
                   <div className="min-w-0 flex-1">
-                    <div className="mono truncate text-[14px] font-medium text-black">
+                    <div className="mono truncate text-[28px] font-semibold leading-tight text-[#7cc08a]">
                       {m.model}
                     </div>
                     <div className="label !normal-case !tracking-normal !text-ink-500">
@@ -390,10 +419,11 @@ export default function ResultList({
                   </div>
                 </div>
                 <SpecList m={m} cols={2} className="w-full" />
-                <div className="mt-auto flex w-full items-center justify-between text-[12px]">
-                  <span className="mono text-ink-500">p.{m.pages[0]}</span>
-                  {m.brand && <span className="mono text-ink-500">{m.brand}</span>}
-                </div>
+                {m.brand && (
+                  <div className="mt-auto flex w-full justify-end text-[12px]">
+                    <span className="mono text-ink-500">{m.brand}</span>
+                  </div>
+                )}
               </button>
             </li>
           );
@@ -420,8 +450,8 @@ export default function ResultList({
               <div className="flex w-full items-center gap-4">
                 <Thumb m={m} active={isActive} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-3">
-                    <span className="mono truncate text-[14px] font-medium text-black">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                    <span className="mono truncate text-[28px] font-semibold leading-tight text-[#7cc08a]">
                       {m.model}
                     </span>
                     <span className="label !normal-case !tracking-normal !text-ink-500 truncate">
@@ -433,9 +463,6 @@ export default function ResultList({
                   {m.brand && (
                     <span className="mono text-[12px] text-black">{m.brand}</span>
                   )}
-                  <span className="mono text-[11px] text-ink-500">
-                    p.{m.pages.join(", ")}
-                  </span>
                 </div>
               </div>
               {/* 스펙은 이미지 아래 영역에 무테 그리드로 정렬 (넓은 행은 4열로 밀도↑) */}
