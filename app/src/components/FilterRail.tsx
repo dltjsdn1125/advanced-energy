@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Catalog, Category, Lineage, Model } from "@/lib/types";
-import { LINEAGE_ORDER, POWER_BUCKETS, wattageNumber } from "@/lib/types";
+import type { Brand, Catalog, Category, Lineage, Model } from "@/lib/types";
+import { BRANDS, LINEAGE_ORDER, POWER_BUCKETS, wattageNumber } from "@/lib/types";
 
 export interface FilterState {
+  /** 제조 브랜드 (raw data/ 의 브랜드 로고 PDF 기준). */
+  brand: Brand | null;
   category: Category | null;
   lineage: Lineage | null;
   family: string | null;
@@ -12,6 +14,8 @@ export interface FilterState {
   power: string | null;
   voltage: string | null;
   inputType: "AC" | "DC" | null;
+  /** When true, hide models whose watts/volts couldn't be parsed. */
+  hideIncomplete: boolean;
 }
 
 interface Props {
@@ -29,12 +33,20 @@ interface Props {
   onMobileClose?: () => void;
 }
 
-const VOLT_OPTIONS = ["3.3V", "5V", "12V", "15V", "24V", "28V", "48V", "54V", "380V"];
+// Voltages we always show even if the current filter scope has zero models
+// with that value — keeps the UI stable while users navigate. Real available
+// values are merged with this list inside the component below.
+const COMMON_VOLT_OPTIONS = ["3.3V", "5V", "12V", "15V", "24V", "28V", "48V"];
 
 function count<T>(arr: T[], pred: (x: T) => boolean) {
   let n = 0;
   for (const x of arr) if (pred(x)) n++;
   return n;
+}
+
+function voltSortKey(v: string): number {
+  const m = v.match(/^([\d.]+)V$/i);
+  return m ? parseFloat(m[1]) : Number.POSITIVE_INFINITY;
 }
 
 export default function FilterRail({
@@ -55,6 +67,7 @@ export default function FilterRail({
     section: false,
     power: true,
     voltage: true,
+    inputType: true,
   });
 
   const familiesInLineage = useMemo<string[]>(() => {
@@ -76,37 +89,94 @@ export default function FilterRail({
     return [...set];
   }, [catalog.sections, state.category, state.lineage, state.family]);
 
-  const catCount = (c: Category) => count(models, (m) => m.category === c);
+  // Each option count is computed against the full model set with EVERY
+  // active filter applied EXCEPT the dimension that option belongs to.
+  // This way clicking that option produces the count shown — and other
+  // options in the same group remain visible (non-zero where possible)
+  // even when an adjacent dimension is already active.
+  function passesExcept(
+    m: Model,
+    ignore: keyof FilterState | null,
+  ): boolean {
+    if (ignore !== "brand" && state.brand && m.brand !== state.brand) return false;
+    if (ignore !== "category" && state.category && m.category !== state.category) return false;
+    if (ignore !== "lineage" && state.lineage && m.lineage !== state.lineage) return false;
+    if (ignore !== "family" && state.family && m.subcategory !== state.family) return false;
+    if (ignore !== "section" && state.section && m.section !== state.section) return false;
+    if (ignore !== "power" && state.power) {
+      const b = POWER_BUCKETS.find((x) => x.id === state.power);
+      if (b) {
+        const w = wattageNumber(m.watts);
+        if (w === null) return false;
+        if (w < b.minW || w >= b.maxW) return false;
+      }
+    }
+    if (ignore !== "voltage" && state.voltage) {
+      const want = state.voltage.toUpperCase();
+      if (m.outputVolts.length === 0) return false;
+      if (!m.outputVolts.some((v) => v.toUpperCase() === want)) return false;
+    }
+    if (ignore !== "inputType" && state.inputType) {
+      if (m.inputType !== state.inputType) return false;
+    }
+    if (ignore !== "hideIncomplete" && state.hideIncomplete) {
+      if (m.watts.length === 0 || m.outputVolts.length === 0) return false;
+    }
+    return true;
+  }
+
+  // Pre-compute the candidate set for each filter dimension so option
+  // counts are O(N) per group instead of O(N*options).
+  const baseForBrand = useMemo(() => models.filter((m) => passesExcept(m, "brand")), [models, state]);
+  const baseForCategory = useMemo(() => models.filter((m) => passesExcept(m, "category")), [models, state]);
+  const baseForLineage = useMemo(() => models.filter((m) => passesExcept(m, "lineage")), [models, state]);
+  const baseForFamily = useMemo(() => models.filter((m) => passesExcept(m, "family")), [models, state]);
+  const baseForSection = useMemo(() => models.filter((m) => passesExcept(m, "section")), [models, state]);
+  const baseForPower = useMemo(() => models.filter((m) => passesExcept(m, "power")), [models, state]);
+  const baseForVoltage = useMemo(() => models.filter((m) => passesExcept(m, "voltage")), [models, state]);
+  const baseForInputType = useMemo(() => models.filter((m) => passesExcept(m, "inputType")), [models, state]);
+
+  const brandCount = (b: Brand) => count(baseForBrand, (m) => m.brand === b);
+  const catCount = (c: Category) => count(baseForCategory, (m) => m.category === c);
   const lineageCount = (lin: Lineage) =>
-    count(categoryScoped, (m) => m.lineage === lin);
+    count(baseForLineage, (m) => m.lineage === lin);
   const familyCount = (fam: string) =>
-    count(lineageScoped, (m) => m.subcategory === fam);
-  const sectionCount = (sec: string) => count(filtered, (m) => m.section === sec);
+    count(baseForFamily, (m) => m.subcategory === fam);
+  const sectionCount = (sec: string) => count(baseForSection, (m) => m.section === sec);
   const powerCount = (id: string) => {
     const b = POWER_BUCKETS.find((x) => x.id === id);
     if (!b) return 0;
-    return count(filtered, (m) => {
+    return count(baseForPower, (m) => {
       const w = wattageNumber(m.watts);
       return w !== null && w >= b.minW && w < b.maxW;
     });
   };
   const voltCount = (v: string) =>
-    count(filtered, (m) =>
-      m.volts.some((x) => x.toUpperCase() === v.toUpperCase()),
+    count(baseForVoltage, (m) =>
+      m.outputVolts.some((x) => x.toUpperCase() === v.toUpperCase()),
     );
+  const inputTypeCount = (t: "AC" | "DC") =>
+    count(baseForInputType, (m) => m.inputType === t);
 
-  const activeChips = [
-    state.category && { key: "category" as const, label: state.category },
-    state.lineage && { key: "lineage" as const, label: state.lineage },
-    state.family && { key: "family" as const, label: state.family },
-    state.section && { key: "section" as const, label: state.section },
-    state.power &&
-      POWER_BUCKETS.find((b) => b.id === state.power) && {
-        key: "power" as const,
-        label: POWER_BUCKETS.find((b) => b.id === state.power)!.label,
-      },
-    state.voltage && { key: "voltage" as const, label: state.voltage },
-  ].filter(Boolean) as { key: keyof FilterState; label: string }[];
+  // Brand totals across the WHOLE catalogue — used to grey out brands that
+  // have no products in this catalogue (e.g. Impac). The number shown on each
+  // button stays context-aware (brandCount), but disabling is based on totals.
+  const brandTotals = useMemo(() => {
+    const t: Record<string, number> = {};
+    for (const b of BRANDS) t[b] = 0;
+    for (const m of models) if (m.brand) t[m.brand] = (t[m.brand] ?? 0) + 1;
+    return t;
+  }, [models]);
+
+  // Dynamic voltage options — union of catalogue-observed voltages and the
+  // common ones, sorted numerically.
+  const voltOptions = useMemo(() => {
+    const seen = new Set<string>(COMMON_VOLT_OPTIONS);
+    for (const m of models) {
+      for (const v of m.outputVolts) seen.add(v);
+    }
+    return [...seen].sort((a, b) => voltSortKey(a) - voltSortKey(b));
+  }, [models]);
 
   function Group({
     id,
@@ -204,52 +274,53 @@ export default function FilterRail({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {/* Active filters */}
-        <div className="flex items-center justify-between">
-          <span className="label">Active Filters</span>
-          {activeChips.length > 0 && (
-            <button
-              onClick={onClear}
-              className="label !text-black underline underline-offset-2 hover:!text-ink-700"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {activeChips.length === 0 ? (
-            <span className="text-[13px] text-ink-400">None selected</span>
-          ) : (
-            activeChips.map((c) => (
+        {/* Brand — 최상단 브랜드 버튼 (raw data/ 로고 PDF 8종 기준) */}
+        <section className="pb-3">
+          <div className="mb-2 flex items-baseline justify-between">
+            <span className="label !text-black">Brand</span>
+            {state.brand && (
               <button
-                key={`${c.key}-${c.label}`}
-                onClick={() => {
-                  const cascade: Partial<FilterState> = {
-                    [c.key]: null,
-                  } as Partial<FilterState>;
-                  if (c.key === "category") {
-                    cascade.lineage = null;
-                    cascade.family = null;
-                    cascade.section = null;
-                  }
-                  if (c.key === "lineage") {
-                    cascade.family = null;
-                    cascade.section = null;
-                  }
-                  if (c.key === "family") cascade.section = null;
-                  onState(cascade);
-                }}
-                className="flex items-center gap-1.5 rounded-pill border border-black bg-lime px-2.5 py-1 text-[12px] font-medium text-black hover:bg-black hover:text-lime"
+                onClick={() => onState({ brand: null })}
+                className="mono text-[11px] text-ink-500 underline underline-offset-2 hover:text-black"
               >
-                <span className="truncate max-w-[180px]">{c.label}</span>
-                <span aria-hidden>×</span>
+                전체
               </button>
-            ))
-          )}
-        </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {BRANDS.map((b) => {
+              const active = state.brand === b;
+              const disabled = brandTotals[b] === 0;
+              return (
+                <button
+                  key={b}
+                  disabled={disabled}
+                  onClick={() => onState({ brand: active ? null : b })}
+                  title={disabled ? `${b} — 이 카탈로그에 제품 없음` : b}
+                  className={`flex items-center justify-between rounded-card border px-2.5 py-1.5 text-left transition ${
+                    active
+                      ? "border-black bg-lime"
+                      : disabled
+                      ? "cursor-not-allowed border-ink-100 bg-ink-50 text-ink-300"
+                      : "border-ink-200 bg-white text-ink-700 hover:border-black hover:text-black"
+                  }`}
+                >
+                  <span className="truncate text-[13px] font-medium">{b}</span>
+                  <span
+                    className={`mono ml-2 shrink-0 text-[11px] ${
+                      active ? "text-black" : disabled ? "text-ink-300" : "text-ink-500"
+                    }`}
+                  >
+                    {brandCount(b)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {/* Category cards */}
-        <section className="mt-4 grid grid-cols-2 gap-2">
+        <section className="grid grid-cols-2 gap-2 border-t border-ink-100 pt-3">
           {(["AC-DC", "DC-DC"] as Category[]).map((c) => {
             const active = state.category === c;
             return (
@@ -357,7 +428,7 @@ export default function FilterRail({
 
         {/* Voltage */}
         <Group id="voltage" title="Output Voltage">
-          {VOLT_OPTIONS.map((v) => (
+          {voltOptions.map((v) => (
             <Option
               key={v}
               label={v}
@@ -369,6 +440,41 @@ export default function FilterRail({
             />
           ))}
         </Group>
+
+        {/* Input Type */}
+        <Group id="inputType" title="Input Type">
+          {(["AC", "DC"] as const).map((t) => (
+            <Option
+              key={t}
+              label={`${t} input`}
+              count={inputTypeCount(t)}
+              active={state.inputType === t}
+              onClick={() =>
+                onState({ inputType: state.inputType === t ? null : t })
+              }
+            />
+          ))}
+        </Group>
+
+        {/* Toggle: hide models with no parsed specs */}
+        <section className="border-t border-ink-100 py-3">
+          <label className="flex items-center justify-between gap-2 text-[14px] text-ink-700">
+            <span>Hide models without spec data</span>
+            <input
+              type="checkbox"
+              checked={state.hideIncomplete}
+              onChange={(e) =>
+                onState({ hideIncomplete: e.target.checked })
+              }
+              className="h-4 w-4 accent-black"
+            />
+          </label>
+          <p className="mono mt-1 text-[11px] text-ink-400">
+            {state.hideIncomplete
+              ? "Showing only models with parsed watts + volts."
+              : "Some models lack parsed watts/volts and are still shown."}
+          </p>
+        </section>
       </div>
 
       <footer className="border-t border-ink-100 px-4 py-3">
@@ -400,7 +506,7 @@ export default function FilterRail({
           "fixed left-0 top-0 z-50 h-[100dvh] w-[min(85vw,320px)] transition-transform duration-300 ease-in-out",
           mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full",
           // Desktop: revert to sticky sidebar, always visible
-          "md:sticky md:top-16 md:z-auto md:h-[calc(100dvh-4rem)] md:w-[280px] md:shrink-0 md:translate-x-0 md:shadow-none",
+          "md:sticky md:top-[6.5rem] md:z-auto md:h-[calc(100dvh-6.5rem)] md:w-[280px] md:shrink-0 md:translate-x-0 md:shadow-none",
         ].join(" ")}
       >
         {railContent}

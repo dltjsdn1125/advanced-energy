@@ -1,5 +1,30 @@
 export type Category = "AC-DC" | "DC-DC";
 
+// ── 제조 브랜드 (raw data/ 의 브랜드 로고 PDF 제목 기준) ────────────────────────
+// Advanced Energy 가 인수·통합한 서브 브랜드. 카탈로그의 각 제품은 시리즈명 규칙
+// 으로 아래 브랜드 중 하나로 분류된다 (data.ts 의 classifyBrand 참고).
+export type Brand =
+  | "Artesyn"
+  | "SL Power"
+  | "Excelsys"
+  | "UltraVolt"
+  | "HiTek"
+  | "Trek"
+  | "Tegam"
+  | "Impac";
+
+// 사이드바 브랜드 버튼 노출 순서. raw data/ PDF 8종과 1:1 대응.
+export const BRANDS: Brand[] = [
+  "Artesyn",
+  "SL Power",
+  "Excelsys",
+  "UltraVolt",
+  "HiTek",
+  "Trek",
+  "Tegam",
+  "Impac",
+];
+
 export type AcDcLineage =
   | "MODULAR"
   | "BULK/DISTRIBUTED/ENCLOSED"
@@ -38,13 +63,23 @@ export interface Model {
   modelKey: string;
   category: Category | null;
   lineage: Lineage | null;
+  /** 제조 브랜드 — data.ts 의 classifyBrand 로 부여. 미분류 시 null. */
+  brand: Brand | null;
   subcategory: string | null;
   section: string | null;
   pages: number[];
   watts: string[];
+  /** Output voltage strings, e.g. "12V", "24V". Same as outputVolts; kept for back-compat. */
   volts: string[];
+  outputVolts: string[];
   amps: string[];
+  /** Pre-formatted input range string, e.g. "90-264 VAC", or null. */
   input: string | null;
+  inputVoltageMin: number | null;
+  inputVoltageMax: number | null;
+  inputType: "AC" | "DC" | null;
+  /** Python parser 가 카탈로그 텍스트에서 미리 뽑은 (한국어 라벨 → 원본 값) */
+  specMap?: Record<string, string>;
   contextLines: string[];
   searchText: string;
   images: CatalogImage[];
