@@ -140,36 +140,91 @@ function certLabel(m: Model): string {
   return out.length ? out.slice(0, 3).join(" · ") : DASH;
 }
 
-function cardSpecs(m: Model): { label: string; value: string }[] {
-  return [
-    { label: "입력", value: inputLabel(m) },
-    { label: "출력", value: outputLabel(m) },
-    { label: "전력", value: powerLabel(m) },
-    { label: "인증", value: certLabel(m) },
-  ];
+// ── 스펙 아이콘 ────────────────────────────────────────────────────────────────
+// 텍스트 라벨(Input/Output/…) 대신 SVG 아이콘으로 밀도 있게 표시. 각 행에는
+// 영문 라벨을 title(툴팁)로 붙여 접근성을 유지한다.
+const ICON: React.SVGProps<SVGSVGElement> = {
+  width: 13,
+  height: 13,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+};
+function InputIcon() {
+  return (
+    <svg {...ICON} aria-hidden>
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <polyline points="10 17 15 12 10 7" />
+      <line x1="15" y1="12" x2="3" y2="12" />
+    </svg>
+  );
+}
+function OutputIcon() {
+  return (
+    <svg {...ICON} aria-hidden>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+function PowerIcon() {
+  return (
+    <svg {...ICON} fill="currentColor" stroke="none" aria-hidden>
+      <path d="M13 2 3 14h7l-1 8 10-12h-7z" />
+    </svg>
+  );
+}
+function CertIcon() {
+  return (
+    <svg {...ICON} aria-hidden>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <polyline points="9 12 11 14 15 10" />
+    </svg>
+  );
 }
 
-// 모든 카드가 공유하는 스펙 그리드 (2열). 값이 없는 필드는 "—" 로 자리를 유지해
-// 카드 간 높이·정렬을 통일한다.
-function SpecGrid({ m, className = "" }: { m: Model; className?: string }) {
+const SPECS = [
+  { key: "input", label: "Input", Icon: InputIcon, get: inputLabel },
+  { key: "output", label: "Output", Icon: OutputIcon, get: outputLabel },
+  { key: "power", label: "Power", Icon: PowerIcon, get: powerLabel },
+  { key: "cert", label: "Cert", Icon: CertIcon, get: certLabel },
+] as const;
+
+// 모든 카드가 공유하는 스펙 표. 이미지 아래 영역에 연한 회색 실선(2×2 격자)으로
+// 정리한다. 값이 없는 필드는 "—" 로 자리를 유지해 카드 간 정렬을 통일한다.
+function SpecTable({ m, className = "" }: { m: Model; className?: string }) {
   return (
-    <dl className={`grid grid-cols-2 gap-x-4 gap-y-1 ${className}`}>
-      {cardSpecs(m).map((s) => (
-        <div key={s.label} className="flex min-w-0 items-baseline gap-1.5">
-          <dt className="w-7 shrink-0 text-[10px] font-semibold text-ink-400">
-            {s.label}
-          </dt>
-          <dd
-            className={`mono truncate text-[12px] ${
-              s.value === DASH ? "text-ink-300" : "text-ink-700"
-            }`}
-            title={s.value}
+    <div
+      className={`grid grid-cols-2 overflow-hidden rounded-md border border-ink-200 ${className}`}
+    >
+      {SPECS.map(({ key, label, Icon, get }, i) => {
+        const value = get(m);
+        return (
+          <div
+            key={key}
+            title={`${label}: ${value}`}
+            className={`flex min-w-0 items-center gap-1.5 px-2 py-1 ${
+              i % 2 === 0 ? "border-r border-ink-200" : ""
+            } ${i < 2 ? "border-b border-ink-200" : ""}`}
           >
-            {s.value}
-          </dd>
-        </div>
-      ))}
-    </dl>
+            <span className="shrink-0 text-ink-400">
+              <Icon />
+            </span>
+            <span
+              className={`mono truncate text-[12px] leading-tight ${
+                value === DASH ? "text-ink-300" : "text-ink-700"
+              }`}
+            >
+              {value}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -218,7 +273,7 @@ export default function ResultList({
                     </div>
                   </div>
                 </div>
-                <SpecGrid m={m} className="w-full" />
+                <SpecTable m={m} className="w-full" />
                 <div className="mt-auto flex w-full items-center justify-between text-[12px]">
                   <span className="mono text-ink-500">p.{m.pages[0]}</span>
                   {m.brand && <span className="mono text-ink-500">{m.brand}</span>}
@@ -239,33 +294,36 @@ export default function ResultList({
           <li key={m.modelKey}>
             <button
               onClick={() => onOpen(m)}
-              className={`group flex w-full items-center gap-4 px-4 py-3 text-left transition ${
+              className={`group flex w-full flex-col gap-2 px-4 py-3 text-left transition ${
                 isActive ? "bg-lime" : "hover:bg-ink-50"
               }`}
               style={
                 isActive ? { boxShadow: "inset 4px 0 0 0 #000000" } : undefined
               }
             >
-              <Thumb m={m} active={isActive} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-3">
-                  <span className="mono truncate text-[14px] font-medium text-black">
-                    {m.model}
-                  </span>
-                  <span className="label !normal-case !tracking-normal !text-ink-500">
-                    {m.section ?? "—"}
+              <div className="flex w-full items-center gap-4">
+                <Thumb m={m} active={isActive} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-3">
+                    <span className="mono truncate text-[14px] font-medium text-black">
+                      {m.model}
+                    </span>
+                    <span className="label !normal-case !tracking-normal !text-ink-500 truncate">
+                      {m.section ?? "—"}
+                    </span>
+                  </div>
+                </div>
+                <div className="hidden shrink-0 flex-col items-end text-right md:flex">
+                  {m.brand && (
+                    <span className="mono text-[12px] text-black">{m.brand}</span>
+                  )}
+                  <span className="mono text-[11px] text-ink-500">
+                    p.{m.pages.join(", ")}
                   </span>
                 </div>
-                <SpecGrid m={m} className="mt-1.5 max-w-2xl" />
               </div>
-              <div className="hidden flex-col items-end text-right md:flex">
-                {m.brand && (
-                  <span className="mono text-[12px] text-black">{m.brand}</span>
-                )}
-                <span className="mono text-[11px] text-ink-500">
-                  p.{m.pages.join(", ")}
-                </span>
-              </div>
+              {/* 스펙은 이미지 아래 영역에 표로 정리 */}
+              <SpecTable m={m} className="w-full sm:max-w-xl" />
             </button>
           </li>
         );
