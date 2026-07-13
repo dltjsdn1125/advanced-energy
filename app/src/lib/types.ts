@@ -84,6 +84,8 @@ export interface Model {
   searchText: string;
   images: CatalogImage[];
   primaryImage: string | null;
+  /** advancedenergy.com 공식 제품 이미지 URL (data.ts 에서 부여). 없으면 로컬 이미지 사용. */
+  webImage?: string | null;
   imageSource: "model-page" | "series-hero" | null;
 }
 

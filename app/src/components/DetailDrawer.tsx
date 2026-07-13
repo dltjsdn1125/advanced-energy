@@ -5,6 +5,9 @@ import type { Model } from "@/lib/types";
 import { assetSrc, getOrderingTablesForModel, getSpecIndex } from "@/lib/data";
 import OrderingConfigurator from "./OrderingConfigurator";
 import { useBasket, modelToBasketItem } from "@/lib/basket";
+import type { AEDoc, AEDocsResult } from "@/app/api/ae-docs/route";
+import type { AESearchResult } from "@/app/api/ae-search/route";
+import { useDocAttachments } from "@/lib/docAttachments";
 
 interface Props {
   model: Model | null;
@@ -112,9 +115,9 @@ function SpecRow({
   value: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[128px,1fr] items-start gap-3 border-b border-ink-100 py-2.5 last:border-b-0">
+    <div className="grid grid-cols-1 items-start gap-1 border-b border-ink-100 py-2.5 last:border-b-0 sm:grid-cols-[128px,1fr] sm:gap-3">
       <span className="label pt-0.5">{label}</span>
-      <span className="mono text-[14px] leading-snug text-black">{value}</span>
+      <span className="mono break-words text-[14px] leading-snug text-black">{value}</span>
     </div>
   );
 }
@@ -141,6 +144,60 @@ export default function DetailDrawer({
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
   const { add, remove, has } = useBasket();
+  const { add: attachDoc, remove: removeDoc, has: hasDoc } = useDocAttachments();
+
+  // AE website document lookup — lazy, silent on failure
+  const [aeDocs, setAeDocs] = useState<AEDoc[] | null>(null);
+  const [aePageUrl, setAePageUrl] = useState<string | null>(null);
+  const [aeLoading, setAeLoading] = useState(false);
+
+  useEffect(() => {
+    if (!model) return;
+    setAeDocs(null);
+    setAePageUrl(null);
+    const ctrl = new AbortController();
+    setAeLoading(true);
+
+    (async () => {
+      try {
+        const sr = await fetch(
+          `/api/ae-search?q=${encodeURIComponent(model.model)}&per=3`,
+          { signal: ctrl.signal },
+        );
+        if (!sr.ok) return;
+        const sd = await sr.json();
+        const results: AESearchResult[] = sd.results ?? [];
+        if (!results.length) return;
+
+        // Prefer a result whose title or URL contains the exact model name
+        const ml = model.model.toLowerCase();
+        const best =
+          results.find(
+            (r) =>
+              r.pageTitle?.toLowerCase().includes(ml) ||
+              r.pageUrl?.toLowerCase().includes(ml.replace(/[^a-z0-9]/gi, "-")),
+          ) ?? results[0];
+        if (!best?.pageUrl) return;
+
+        const dr = await fetch(
+          `/api/ae-docs?url=${encodeURIComponent(best.pageUrl)}`,
+          { signal: ctrl.signal },
+        );
+        if (!dr.ok) return;
+        const dd: AEDocsResult = await dr.json();
+        if (!ctrl.signal.aborted) {
+          setAePageUrl(best.pageUrl);
+          setAeDocs(dd.docs ?? []);
+        }
+      } catch {
+        // silently ignore — section stays hidden
+      } finally {
+        if (!ctrl.signal.aborted) setAeLoading(false);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [model?.modelKey]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -221,17 +278,19 @@ export default function DetailDrawer({
   return (
     <>
       <div
-        className="fixed inset-0 z-30 bg-black/50 transition-opacity"
+        className="fixed inset-x-0 bottom-0 top-10 z-30 bg-black/50 transition-opacity"
         onClick={onClose}
       />
       <aside
-        className="fixed right-0 top-0 z-40 flex h-[100dvh] w-full max-w-[680px] flex-col border-l border-black bg-white shadow-card"
+        className="fixed right-0 top-10 z-40 flex h-[calc(100dvh-40px)] w-full max-w-[680px] flex-col border-l border-black bg-white shadow-card"
         role="dialog"
         aria-labelledby="drawer-title"
       >
         {/* ── Header ─────────────────────────────────────────────── */}
-        <header className="flex items-center justify-between gap-3 border-b border-ink-100 px-6 py-4">
-          <div className="min-w-0 flex-1">
+        {/* Stacks vertically on mobile so the title and the action buttons
+            never overlap; side-by-side from the sm breakpoint up. */}
+        <header className="flex flex-col gap-3 border-b border-ink-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+          <div className="min-w-0 sm:flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               {model.category && <Chip tone="dark">{model.category}</Chip>}
               {model.lineage && <Chip>{model.lineage}</Chip>}
@@ -239,7 +298,7 @@ export default function DetailDrawer({
             </div>
             <h2
               id="drawer-title"
-              className="mono mt-1.5 truncate text-[25px] font-semibold tracking-tightest text-black"
+              className="mono mt-1.5 truncate text-[19px] font-semibold tracking-tightest text-black sm:text-[25px]"
             >
               {model.model}
             </h2>
@@ -247,7 +306,8 @@ export default function DetailDrawer({
               {model.section ?? "Unclassified"}
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:flex-col sm:items-end">
+            <div className="flex items-center gap-1.5">
             <button
               onClick={() => {
                 if (!model) return;
@@ -278,6 +338,14 @@ export default function DetailDrawer({
                   : "＋ 선택 저장"}
             </button>
             <button
+              onClick={() => window.dispatchEvent(new CustomEvent("ae:open-basket"))}
+              className="mono rounded-pill border border-black bg-white px-3 py-1.5 text-[12px] font-semibold text-black transition hover:bg-black hover:text-lime"
+              title="저장된 선택 목록 열기 — Outlook 이메일 작성"
+            >
+              저장 목록 →
+            </button>
+            </div>
+            <button
               onClick={onClose}
               className="label rounded-pill border border-ink-200 bg-white px-3 py-1.5 !text-black hover:bg-ink-50"
               aria-label="Close detail"
@@ -288,18 +356,18 @@ export default function DetailDrawer({
         </header>
 
         {/* ── Body ──────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {/* Hero image */}
-          {model.primaryImage && (
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          {/* Hero image — prefer the consistent AE web image. */}
+          {(model.webImage || model.primaryImage) && (
             <section className="mb-5">
-              <div className="relative grid place-items-center rounded-card border border-ink-200 bg-white p-6">
+              <div className="relative grid place-items-center rounded-card border border-ink-200 bg-white p-4 sm:p-6">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={assetSrc(model.primaryImage)}
+                  src={assetSrc(model.webImage ?? model.primaryImage)}
                   alt={model.model}
-                  className="max-h-[280px] w-auto object-contain"
+                  className="max-h-[200px] w-auto max-w-full object-contain sm:max-h-[280px]"
                 />
-                {model.imageSource === "series-hero" && (
+                {!model.webImage && model.imageSource === "series-hero" && (
                   <span className="absolute left-3 top-3 rounded-pill border border-black bg-white px-2 py-0.5 text-[11px] font-medium text-black">
                     Series photo
                   </span>
@@ -623,6 +691,85 @@ export default function DetailDrawer({
             </section>
           )}
 
+          {/* AE 공식 문서 — only shown when docs are found */}
+          {(aeLoading || (aeDocs && aeDocs.length > 0)) && (
+            <section className="mt-6">
+              <h3 className="label mb-2 flex items-center gap-2">
+                AE 공식 문서
+                {aePageUrl && (
+                  <a
+                    href={aePageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mono text-[11px] font-normal text-ink-500 underline underline-offset-2 hover:text-black"
+                  >
+                    advancedenergy.com ↗
+                  </a>
+                )}
+              </h3>
+              {aeLoading ? (
+                <div className="space-y-1.5 animate-pulse">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-8 rounded bg-ink-100" />
+                  ))}
+                </div>
+              ) : (
+                <ul className="space-y-1.5">
+                  {aeDocs!.map((doc, i) => {
+                    const colorCls = doc.type.includes("Technical Reference")
+                      ? "border-blue-300 text-blue-700 bg-blue-50"
+                      : doc.type.includes("Datasheet")
+                        ? "border-[#FE5000] text-[#FE5000] bg-orange-50"
+                        : doc.type.includes("User Guide")
+                          ? "border-green-400 text-green-700 bg-green-50"
+                          : doc.type.includes("Application")
+                            ? "border-purple-300 text-purple-700 bg-purple-50"
+                            : "border-ink-200 text-ink-600 bg-white";
+                    const attached = hasDoc(doc.url);
+                    return (
+                      <li key={i} className="flex items-center gap-2">
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`mono inline-flex flex-1 items-center gap-1.5 rounded-pill border px-2.5 py-1 text-[11px] font-medium transition-colors hover:opacity-80 ${colorCls}`}
+                        >
+                          <svg width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M4.5 1v7M1.5 5l3 4 3-4M0.5 10h8" />
+                          </svg>
+                          <span className="truncate">{doc.title || doc.type}</span>
+                          <span className="text-[10px] opacity-60 shrink-0">· {doc.type}</span>
+                        </a>
+                        <button
+                          onClick={() => attached
+                            ? removeDoc(doc.url)
+                            : attachDoc({ url: doc.url, title: doc.title || doc.type, docType: doc.type, productTitle: model.model })
+                          }
+                          title={attached ? "첨부 취소" : "저장 목록에 추가 (Outlook 첨부)"}
+                          className={`shrink-0 inline-flex h-6 w-6 items-center justify-center rounded border transition-colors ${
+                            attached
+                              ? "border-lime-400 bg-lime text-black hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+                              : "border-[#0078D4] bg-white text-[#0078D4] hover:bg-[#0078D4] hover:text-white"
+                          }`}
+                        >
+                          {attached ? (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M5 13l4 4L19 7"/>
+                            </svg>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M22 6v12a2 2 0 0 1-2 2H11V4h9a2 2 0 0 1 2 2zM9 4v16H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5zm-2 5H4v2h3V9zm0 3H4v2h3v-2z"/>
+                            </svg>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          )}
+
           {/* Related */}
           {related.length > 0 && (
             <section className="mt-6 mb-2">
@@ -637,11 +784,11 @@ export default function DetailDrawer({
                       onClick={() => onSelect(m)}
                       className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-lime-soft"
                     >
-                      {m.primaryImage ? (
-                        <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md border border-ink-200 bg-white">
+                      {(m.webImage || m.primaryImage) ? (
+                        <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-md border border-ink-200 bg-white p-0.5">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={assetSrc(m.primaryImage)}
+                            src={assetSrc(m.webImage ?? m.primaryImage)}
                             alt=""
                             loading="lazy"
                             className="max-h-full max-w-full object-contain"
@@ -668,7 +815,7 @@ export default function DetailDrawer({
         </div>
 
         {/* ── Footer actions ─────────────────────────────────────── */}
-        <footer className="flex items-center justify-between gap-3 border-t border-ink-100 px-6 py-3">
+        <footer className="flex items-center justify-between gap-2 border-t border-ink-100 px-4 py-3 sm:gap-3 sm:px-6">
           <a
             href={`docs/AE%20Catalogue2026.pdf#page=${model.pages[0]}`}
             target="_blank"

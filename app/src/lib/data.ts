@@ -1,6 +1,7 @@
 import catalogJson from "../../public/data/catalog.json";
 import specsJson from "../../public/data/specs.json";
 import orderingJson from "../../public/data/ordering.json";
+import webImagesJson from "../../public/data/webImages.json";
 import type { Brand, Catalog, Model, OrderingIndex, OrderingTable, SpecIndex, Lineage } from "./types";
 
 // ── 인증번호·표준코드 필터 ────────────────────────────────────────────────────
@@ -336,10 +337,13 @@ const reclassified = reclassifyRackModels(baseFiltered);
 const existingKeys = new Set(reclassified.map((m) => m.modelKey));
 const hvToAdd = HV_SYNTHETIC_SERIES.filter((m) => !existingKeys.has(m.modelKey));
 
-// 4) 브랜드 부여 — 최종 모델셋 전체에 classifyBrand 적용
+// 4) 브랜드 + 웹 이미지 부여 — 최종 모델셋 전체에 적용
+//    webImages: modelKey → advancedenergy.com 공식 이미지 URL (Semigate 제품 마스터 기반)
+const webImages = webImagesJson as Record<string, string>;
 const filteredModels = [...reclassified, ...hvToAdd].map((m) => ({
   ...m,
   brand: classifyBrand(m.model, m.section, m.subcategory),
+  webImage: webImages[m.modelKey] ?? null,
 }));
 
 // 인증번호·유령 항목을 제외한 실제 제품만 담은 카탈로그를 내보낸다.
