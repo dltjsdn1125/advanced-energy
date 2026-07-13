@@ -297,11 +297,11 @@ export default function FilterRail({
                   disabled={disabled}
                   onClick={() => onState({ brand: active ? null : b })}
                   title={disabled ? `${b} — 이 카탈로그에 제품 없음` : b}
-                  className={`flex items-center justify-between rounded-card border px-2.5 py-1.5 text-left transition ${
+                  className={`flex min-h-[34px] items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
                     active
-                      ? "border-black bg-lime"
+                      ? "border-black bg-lime text-black"
                       : disabled
-                      ? "cursor-not-allowed border-ink-100 bg-ink-50 text-ink-300"
+                      ? "cursor-not-allowed border-dashed border-ink-200 bg-ink-50 text-ink-300"
                       : "border-ink-200 bg-white text-ink-700 hover:border-black hover:text-black"
                   }`}
                 >
