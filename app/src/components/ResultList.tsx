@@ -168,10 +168,44 @@ function freqLabel(m: Model): string {
   return one ? `${one[1]} Hz` : f.length <= 10 ? f : DASH;
 }
 
+// 치수는 항상 mm 로만 표시한다. 소스가 인치면 ×25.4 변환, mm 병기가 있으면
+// 그 값을 사용. 헤더/오추출 문자열("… Model", 효율값 등)은 치수가 아니므로 제외.
 function dimLabel(m: Model): string {
   const s = m.specMap ?? {};
-  const d = clean(s["크기"] || s["Dimensions"] || s["Size"]);
-  return d || DASH;
+  const mm3 = (a: number, b: number, c: number) =>
+    `${Math.round(a)} × ${Math.round(b)} × ${Math.round(c)} mm`;
+
+  // 1) 깨끗한 인치 L/W/H 필드 → mm 변환
+  const L = parseFloat(clean(s["Length (Inches)"]));
+  const W = parseFloat(clean(s["Width (Inches)"]));
+  const H = parseFloat(clean(s["Height (Inches)"]));
+  if ([L, W, H].every((x) => Number.isFinite(x) && x > 0)) {
+    return mm3(L * 25.4, W * 25.4, H * 25.4);
+  }
+
+  // 2) 자유 텍스트 "크기"
+  const raw = clean(s["크기"] || s["Dimensions"] || s["Size"]);
+  if (!raw || /model|typical|%|V:|W x L x H/i.test(raw)) return DASH;
+
+  // 2a) 괄호 안 mm 병기값 (예: "… (44 mm) … (224 mm) … (262 mm)")
+  const mm = [...raw.matchAll(/([\d.]+)\s*mm/gi)]
+    .map((x) => parseFloat(x[1]))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (mm.length >= 3) return mm3(mm[0], mm[1], mm[2]);
+
+  // 2b) 삼중값 "a x b x c" (+ 단위 판별)
+  const t = raw.match(/([\d.]+)\s*[x×]\s*([\d.]+)\s*[x×]\s*([\d.]+)/i);
+  if (t) {
+    const a = parseFloat(t[1]);
+    const b = parseFloat(t[2]);
+    const c = parseFloat(t[3]);
+    if ([a, b, c].every((x) => Number.isFinite(x) && x > 0)) {
+      const isMm = /\bmm\b/i.test(raw) && !/\bin\b|inch|"/i.test(raw);
+      const f = isMm ? 1 : 25.4;
+      return mm3(a * f, b * f, c * f);
+    }
+  }
+  return DASH;
 }
 
 // ── 스펙 아이콘 ────────────────────────────────────────────────────────────────
