@@ -13,10 +13,8 @@ interface Props {
 function ThumbIcon({ active }: { active?: boolean }) {
   return (
     <svg
-      width="56"
-      height="56"
       viewBox="0 0 40 40"
-      className="shrink-0"
+      className="h-3/4 w-3/4 shrink-0"
       aria-hidden
     >
       <rect
@@ -45,14 +43,14 @@ function ThumbIcon({ active }: { active?: boolean }) {
 function Thumb({ m, active }: { m: Model; active?: boolean }) {
   if (!m.primaryImage) {
     return (
-      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-md border border-ink-200 bg-white">
+      <div className="grid h-28 w-28 shrink-0 place-items-center rounded-md border border-ink-200 bg-white">
         <ThumbIcon active={active} />
       </div>
     );
   }
   return (
     <div
-      className={`grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-md border ${
+      className={`grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-md border ${
         active ? "border-black bg-white" : "border-ink-200 bg-white"
       }`}
     >
@@ -68,17 +66,24 @@ function Thumb({ m, active }: { m: Model; active?: boolean }) {
   );
 }
 
+function wattsLabel(watts: string[]): string {
+  if (!watts.length) return "";
+  if (watts.length === 1) return watts[0];
+  return `${watts[0]}-${watts[watts.length - 1]}`;
+}
+
 function primarySpec(m: Model): string {
   const bits: string[] = [];
   if (m.input) bits.push(m.input);
-  if (m.watts[0]) bits.push(m.watts[0]);
+  const wl = wattsLabel(m.watts);
+  if (wl) bits.push(wl);
   if (m.volts.length) bits.push(m.volts.slice(0, 2).join(" / "));
   if (!bits.length && m.contextLines[0]) return m.contextLines[0];
   return bits.join(" · ");
 }
 
 function rightPrimary(m: Model): string {
-  return m.watts[0] ?? m.section ?? "—";
+  return wattsLabel(m.watts) || m.section || "—";
 }
 
 export default function ResultList({
