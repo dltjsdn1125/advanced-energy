@@ -410,7 +410,7 @@ export default function ResultList({
                 <div className="flex w-full items-center gap-3">
                   <Thumb m={m} active={active} />
                   <div className="min-w-0 flex-1">
-                    <div className="mono break-words text-[20px] font-semibold leading-tight text-[#4fbf74]">
+                    <div className="mono break-words text-[20px] font-semibold leading-tight text-black">
                       {m.model}
                     </div>
                     <div className="label !normal-case !tracking-normal !text-ink-500">
@@ -451,7 +451,7 @@ export default function ResultList({
                 <Thumb m={m} active={isActive} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                    <span className="mono break-words text-[20px] font-semibold leading-tight text-[#4fbf74]">
+                    <span className="mono break-words text-[20px] font-semibold leading-tight text-black">
                       {m.model}
                     </span>
                     <span className="label !normal-case !tracking-normal !text-ink-500 truncate">
