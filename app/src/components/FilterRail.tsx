@@ -299,26 +299,26 @@ export default function FilterRail({
                   title={disabled ? `${b} — 이 카탈로그에 제품 없음` : b}
                   className={`flex min-h-[34px] items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
                     active
-                      ? "border-black bg-lime text-black"
+                      ? "border-transparent bg-lime text-black"
                       : disabled
                       ? "cursor-not-allowed border-dashed border-ink-200 bg-ink-50 text-ink-300"
                       : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50 hover:text-black"
                   }`}
                 >
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    {BRAND_LOGO[b] && (
-                      // Semigate 취급 브랜드 로고 (외부 호스팅). 흰 배경 로고가
-                      // lime 활성 배경과 겹치지 않게 작은 흰 패드 위에 얹는다.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={BRAND_LOGO[b]}
-                        alt=""
-                        loading="lazy"
-                        className="h-4 w-auto max-w-[44px] shrink-0 rounded-sm bg-white object-contain px-0.5"
-                      />
-                    )}
+                  {BRAND_LOGO[b] ? (
+                    // 로고가 있는 브랜드는 텍스트 대신 로고만 표시 (원본 78px 를
+                    // 24px 로 축소 — 억지 확대 없이 object-contain 으로 비율 유지).
+                    // 흰 패드 위에 얹어 lime/흰 버튼 어디서든 또렷하게 보이게 한다.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={BRAND_LOGO[b]}
+                      alt={b}
+                      loading="lazy"
+                      className="h-6 w-auto max-w-[112px] shrink-0 rounded bg-white object-contain px-1 py-0.5"
+                    />
+                  ) : (
                     <span className="truncate text-[13px] font-medium">{b}</span>
-                  </span>
+                  )}
                   <span
                     className={`mono ml-2 shrink-0 text-[11px] ${
                       active ? "text-black" : disabled ? "text-ink-300" : "text-ink-500"
@@ -349,8 +349,8 @@ export default function FilterRail({
                 }
                 className={`flex flex-col items-start rounded-card border px-3 py-2.5 text-left transition ${
                   active
-                    ? "border-black bg-lime"
-                    : "border-ink-200 bg-white hover:border-black"
+                    ? "border-transparent bg-lime"
+                    : "border-ink-200 bg-white hover:bg-ink-50"
                 }`}
               >
                 <span className="label !tracking-[0.08em] !text-black">

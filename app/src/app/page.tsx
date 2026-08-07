@@ -329,11 +329,11 @@ export default function Home() {
 
               {/* Desktop right cluster — nav + view toggle */}
               <div className="hidden shrink-0 items-center gap-1.5 md:flex">
-                <Link href="/filter/" className="mono whitespace-nowrap rounded-pill border border-ink-300 bg-white px-2 py-1 text-[11px] font-semibold text-black hover:border-black hover:bg-lime">Filter →</Link>
-                <Link href="/finder/" className="mono whitespace-nowrap rounded-pill border border-black bg-lime px-2 py-1 text-[11px] font-semibold text-black hover:bg-black hover:text-lime">Finder →</Link>
-                <Link href="/search/" className="mono whitespace-nowrap rounded-pill border border-ink-300 bg-white px-2 py-1 text-[11px] font-semibold text-black hover:border-black hover:bg-lime">Search →</Link>
-                <Link href="/rfq/" className="mono whitespace-nowrap rounded-pill border border-ink-300 bg-white px-2 py-1 text-[11px] font-semibold text-black hover:border-black hover:bg-lime">RFQ →</Link>
-                <Link href="/outlook/" className="mono whitespace-nowrap rounded-pill border border-ink-300 bg-white px-2 py-1 text-[11px] font-semibold text-black hover:border-black hover:bg-lime">Outlook →</Link>
+                <Link href="/filter/" className="mono whitespace-nowrap rounded-pill border border-ink-300 bg-white px-2 py-1 text-[11px] font-semibold text-black hover:bg-lime">Filter →</Link>
+                <Link href="/finder/" className="mono whitespace-nowrap rounded-pill border border-transparent bg-lime px-2 py-1 text-[11px] font-semibold text-black hover:bg-black hover:text-lime">Finder →</Link>
+                <Link href="/search/" className="mono whitespace-nowrap rounded-pill border border-ink-300 bg-white px-2 py-1 text-[11px] font-semibold text-black hover:bg-lime">Search →</Link>
+                <Link href="/rfq/" className="mono whitespace-nowrap rounded-pill border border-ink-300 bg-white px-2 py-1 text-[11px] font-semibold text-black hover:bg-lime">RFQ →</Link>
+                <Link href="/outlook/" className="mono whitespace-nowrap rounded-pill border border-ink-300 bg-white px-2 py-1 text-[11px] font-semibold text-black hover:bg-lime">Outlook →</Link>
                 <span className="mono hidden whitespace-nowrap text-[11px] text-ink-500 xl:inline">{catalog.meta.modelCount.toLocaleString()} indexed</span>
                 <div className="flex items-center rounded-pill border border-ink-200 p-0.5">
                   <button onClick={() => setView("list")} aria-pressed={view === "list"} className={`label rounded-pill px-2 py-0.5 transition ${view === "list" ? "bg-black !text-white" : "!text-ink-700 hover:!text-black"}`}>List</button>
@@ -365,7 +365,7 @@ export default function Home() {
           <nav className="border-t border-ink-100 bg-white px-3 py-2 md:hidden">
             <div className="grid grid-cols-2 gap-1.5">
               <Link href="/filter/" onClick={() => setMobileMenuOpen(false)} className="mono rounded-md border border-ink-200 px-2 py-2 text-center text-[11px] font-medium text-black active:bg-ink-50">Filter</Link>
-              <Link href="/finder/" onClick={() => setMobileMenuOpen(false)} className="mono rounded-md border border-black bg-lime px-2 py-2 text-center text-[11px] font-semibold text-black">Finder</Link>
+              <Link href="/finder/" onClick={() => setMobileMenuOpen(false)} className="mono rounded-md border border-transparent bg-lime px-2 py-2 text-center text-[11px] font-semibold text-black">Finder</Link>
               <Link href="/search/" onClick={() => setMobileMenuOpen(false)} className="mono rounded-md border border-ink-200 px-2 py-2 text-center text-[11px] font-medium text-black active:bg-ink-50">Search</Link>
               <Link href="/rfq/" onClick={() => setMobileMenuOpen(false)} className="mono rounded-md border border-ink-200 px-2 py-2 text-center text-[11px] font-medium text-black active:bg-ink-50">RFQ</Link>
               <Link href="/outlook/" onClick={() => setMobileMenuOpen(false)} className="mono col-span-2 rounded-md border border-ink-200 px-2 py-2 text-center text-[11px] font-medium text-black active:bg-ink-50">Outlook</Link>
@@ -406,7 +406,7 @@ export default function Home() {
                     <button
                       key={`${c.key}-${c.label}`}
                       onClick={() => removeChip(c.key)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-2.5 py-0.5 text-[12px] text-black antialiased hover:border-black hover:bg-ink-50 md:text-[13px]"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-2.5 py-0.5 text-[12px] text-black antialiased hover:bg-ink-50 md:text-[13px]"
                     >
                       <span className="max-w-[180px] truncate">{c.label}</span>
                       <span aria-hidden className="text-ink-500">×</span>

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Gowun+Dodum&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Gowun+Dodum&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -20,18 +20,22 @@ html,
 body {
   background: #ffffff;
   color: #000000;
-  /* 영문·숫자는 Geist가 먼저 매칭되어 기존 그대로 렌더되고, Geist가 커버하지
-     않는 한글 글리프만 브라우저가 Gowun Dodum 으로 자동 폴백합니다
-     (Unicode range 기반 per-character 글리프 선택). */
-  font-family: "Geist", "Gowun Dodum", system-ui, sans-serif;
-  font-feature-settings: "ss01", "cv11";
+  /* 전역 폰트: IBM Plex Sans. 한글 글리프는 IBM Plex Sans KR 로 자동 폴백. */
+  font-family: "IBM Plex Sans", "IBM Plex Sans KR", system-ui, sans-serif;
+  /* High-DPI font rendering on every platform. webkit covers Chrome/Safari,
+     moz-osx covers Firefox on macOS, and text-rendering improves kerning
+     for small UI labels (the Filter/Finder/Search pills, chip labels …). */
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .mono {
-  /* 영문·숫자는 JetBrains Mono(고정폭) 유지, 한글만 Gowun Dodum 으로 폴백. */
-  font-family: "JetBrains Mono", "Gowun Dodum", ui-monospace, Consolas, monospace;
+  /* 고정폭: IBM Plex Mono. 한글은 IBM Plex Sans KR 로 폴백. */
+  font-family: "IBM Plex Mono", "IBM Plex Sans KR", ui-monospace, Consolas, monospace;
   font-feature-settings: "tnum", "zero";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .label {

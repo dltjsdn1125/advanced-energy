@@ -53,7 +53,7 @@ function Thumb({ m, active }: { m: Model; active?: boolean }) {
   return (
     <div
       className={`grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-md border bg-white p-1.5 ${
-        active ? "border-black" : "border-ink-200"
+        active ? "border-lime" : "border-ink-200"
       }`}
     >
       {/* Native img to avoid next/image config on static export. */}
@@ -328,8 +328,8 @@ export default function ResultList({
                 onClick={() => onOpen(m)}
                 className={`flex h-full w-full flex-col items-start gap-3 rounded-card border p-4 text-left transition ${
                   active
-                    ? "border-black bg-lime"
-                    : "border-ink-200 bg-white hover:border-black"
+                    ? "border-transparent bg-lime"
+                    : "border-ink-200 bg-white hover:bg-ink-50"
                 }`}
               >
                 <div className="flex w-full items-center gap-3">
