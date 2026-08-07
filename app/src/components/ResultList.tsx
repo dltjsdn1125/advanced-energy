@@ -1,7 +1,30 @@
 "use client";
 
-import type { Model } from "@/lib/types";
+import type { Brand, Model } from "@/lib/types";
+import { BRAND_LOGO } from "@/lib/types";
 import { assetSrc } from "@/lib/data";
+
+// 카드의 벤더 표시 — 로고가 있으면 텍스트 대신 로고를, 모든 브랜드가 동일한 크기
+// 박스(h-4 × w-16) 안에서 object-contain 으로(늘림 없이) 표시한다. 로고가 없는
+// 브랜드(SL Power·Tegam)는 작은 텍스트로 폴백.
+function BrandTag({ brand }: { brand: Brand | null | undefined }) {
+  if (!brand) return null;
+  const logo = BRAND_LOGO[brand];
+  if (logo) {
+    return (
+      <span className="inline-flex h-4 w-16 items-center justify-end">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logo}
+          alt={brand}
+          loading="lazy"
+          className="max-h-full max-w-full object-contain"
+        />
+      </span>
+    );
+  }
+  return <span className="mono text-[11px] text-ink-500">{brand}</span>;
+}
 
 interface Props {
   items: Model[];
@@ -345,8 +368,8 @@ export default function ResultList({
                 </div>
                 <SpecList m={m} cols={2} className="w-full" />
                 {m.brand && (
-                  <div className="mt-auto flex w-full justify-end text-[12px]">
-                    <span className="mono text-ink-500">{m.brand}</span>
+                  <div className="mt-auto flex w-full justify-end">
+                    <BrandTag brand={m.brand} />
                   </div>
                 )}
               </button>
@@ -385,9 +408,7 @@ export default function ResultList({
                   </div>
                 </div>
                 <div className="hidden shrink-0 flex-col items-end text-right md:flex">
-                  {m.brand && (
-                    <span className="mono text-[12px] text-black">{m.brand}</span>
-                  )}
+                  <BrandTag brand={m.brand} />
                 </div>
               </div>
               {/* 스펙은 이미지 아래 영역에 무테 그리드로 정렬 (넓은 행은 4열로 밀도↑) */}
