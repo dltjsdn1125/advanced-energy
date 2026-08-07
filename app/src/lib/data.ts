@@ -347,10 +347,83 @@ const reclassified = reclassifyRackModels(baseFiltered);
 const existingKeys = new Set(reclassified.map((m) => m.modelKey));
 const hvToAdd = HV_SYNTHETIC_SERIES.filter((m) => !existingKeys.has(m.modelKey));
 
-// 4) 브랜드 + 웹 이미지 부여 — 최종 모델셋 전체에 적용
+// 4) 시리즈 공통 스펙 상속 ────────────────────────────────────────────────────
+// PDF 표에서 개별 부품번호 변형(예: CINT3110A1908K01)이 시리즈 공통값(입력전압
+// 등)을 못 물려받아 카드에 "—" 로 뜨는 문제를 보완한다. 같은 시리즈(섹션 + 부품
+// 접두사) 안에서 값이 '하나로 일치'할 때만 채운다 — 입력이 U/H 로 갈리는 시리즈는
+// 애매하므로 건드리지 않아 오값을 넣지 않는다. (입력전압 275개 등 회복)
+const SERIES_SPEC_KEYS = [
+  "효율",
+  "Efficiency",
+  "입력 주파수",
+  "Input Frequency",
+  "주파수",
+  "의료 인증",
+  "산업 인증",
+];
+function seriesKey(m: Model): string {
+  const mm = /^([A-Za-z]+[0-9]+)/.exec(m.model || "");
+  return `${m.section ?? ""}|${(mm ? mm[1] : m.model || "").toUpperCase()}`;
+}
+function inheritSeriesSpecs(models: Model[]): Model[] {
+  const byKey = new Map<string, Model[]>();
+  for (const m of models) {
+    const k = seriesKey(m);
+    const arr = byKey.get(k);
+    if (arr) arr.push(m);
+    else byKey.set(k, [m]);
+  }
+  const repInput = new Map<string, Model>();
+  const repSpec = new Map<string, Record<string, string>>();
+  for (const [k, ms] of byKey) {
+    const inputs = new Map<string, Model>();
+    for (const m of ms) if (m.input) inputs.set(m.input, m);
+    if (inputs.size === 1) repInput.set(k, [...inputs.values()][0]);
+
+    const spec: Record<string, string> = {};
+    for (const key of SERIES_SPEC_KEYS) {
+      const vals = new Set<string>();
+      for (const m of ms) {
+        const v = m.specMap?.[key];
+        if (v) vals.add(v);
+      }
+      if (vals.size === 1) spec[key] = [...vals][0];
+    }
+    if (Object.keys(spec).length) repSpec.set(k, spec);
+  }
+  return models.map((m) => {
+    const k = seriesKey(m);
+    let next = m;
+    if (!m.input && repInput.has(k)) {
+      const r = repInput.get(k)!;
+      next = {
+        ...next,
+        input: r.input,
+        inputVoltageMin: r.inputVoltageMin,
+        inputVoltageMax: r.inputVoltageMax,
+        inputType: r.inputType ?? next.inputType,
+      };
+    }
+    const spec = repSpec.get(k);
+    if (spec) {
+      const merged: Record<string, string> = { ...(next.specMap ?? {}) };
+      let changed = false;
+      for (const [key, val] of Object.entries(spec)) {
+        if (!merged[key]) {
+          merged[key] = val;
+          changed = true;
+        }
+      }
+      if (changed) next = { ...next, specMap: merged };
+    }
+    return next;
+  });
+}
+
+// 5) 브랜드 + 웹 이미지 부여 — 최종 모델셋 전체에 적용
 //    webImages: modelKey → advancedenergy.com 공식 이미지 URL (Semigate 제품 마스터 기반)
 const webImages = webImagesJson as Record<string, string>;
-const filteredModels = [...reclassified, ...hvToAdd].map((m) => ({
+const filteredModels = inheritSeriesSpecs([...reclassified, ...hvToAdd]).map((m) => ({
   ...m,
   brand: classifyBrand(m.model, m.section, m.subcategory),
   webImage: webImages[m.modelKey] ?? null,

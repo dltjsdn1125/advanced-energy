@@ -25,6 +25,17 @@ export const BRANDS: Brand[] = [
   "Impac",
 ];
 
+// 브랜드별 벤더 로고 — semigate.com 취급 브랜드 페이지(sub3_1.php)의 로고 이미지.
+// SL Power·Tegam 은 해당 페이지에 로고가 없어 제외(텍스트만 표시).
+export const BRAND_LOGO: Partial<Record<Brand, string>> = {
+  Artesyn: "https://www.semigate.com/img/common/foot_banner1.png",
+  Excelsys: "https://www.semigate.com/img/common/foot_banner11.png",
+  UltraVolt: "https://www.semigate.com/img/common/foot_banner12.png",
+  HiTek: "https://www.semigate.com/img/common/foot_banner13.png",
+  Trek: "https://www.semigate.com/img/common/foot_banner10.png",
+  Impac: "https://www.semigate.com/img/common/foot_banner7.png",
+};
+
 export type AcDcLineage =
   | "MODULAR"
   | "BULK/DISTRIBUTED/ENCLOSED"

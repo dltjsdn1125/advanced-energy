@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Brand, Catalog, Category, Lineage, Model } from "@/lib/types";
-import { BRANDS, LINEAGE_ORDER, POWER_BUCKETS, wattageNumber } from "@/lib/types";
+import { BRAND_LOGO, BRANDS, LINEAGE_ORDER, POWER_BUCKETS, wattageNumber } from "@/lib/types";
 
 export interface FilterState {
   /** 제조 브랜드 (raw data/ 의 브랜드 로고 PDF 기준). */
@@ -302,10 +302,23 @@ export default function FilterRail({
                       ? "border-black bg-lime text-black"
                       : disabled
                       ? "cursor-not-allowed border-dashed border-ink-200 bg-ink-50 text-ink-300"
-                      : "border-ink-200 bg-white text-ink-700 hover:border-black hover:text-black"
+                      : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50 hover:text-black"
                   }`}
                 >
-                  <span className="truncate text-[13px] font-medium">{b}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {BRAND_LOGO[b] && (
+                      // Semigate 취급 브랜드 로고 (외부 호스팅). 흰 배경 로고가
+                      // lime 활성 배경과 겹치지 않게 작은 흰 패드 위에 얹는다.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={BRAND_LOGO[b]}
+                        alt=""
+                        loading="lazy"
+                        className="h-4 w-auto max-w-[44px] shrink-0 rounded-sm bg-white object-contain px-0.5"
+                      />
+                    )}
+                    <span className="truncate text-[13px] font-medium">{b}</span>
+                  </span>
                   <span
                     className={`mono ml-2 shrink-0 text-[11px] ${
                       active ? "text-black" : disabled ? "text-ink-300" : "text-ink-500"
