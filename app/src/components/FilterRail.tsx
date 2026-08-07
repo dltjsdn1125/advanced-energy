@@ -127,7 +127,6 @@ export default function FilterRail({
 
   // Pre-compute the candidate set for each filter dimension so option
   // counts are O(N) per group instead of O(N*options).
-  const baseForBrand = useMemo(() => models.filter((m) => passesExcept(m, "brand")), [models, state]);
   const baseForCategory = useMemo(() => models.filter((m) => passesExcept(m, "category")), [models, state]);
   const baseForLineage = useMemo(() => models.filter((m) => passesExcept(m, "lineage")), [models, state]);
   const baseForFamily = useMemo(() => models.filter((m) => passesExcept(m, "family")), [models, state]);
@@ -136,7 +135,6 @@ export default function FilterRail({
   const baseForVoltage = useMemo(() => models.filter((m) => passesExcept(m, "voltage")), [models, state]);
   const baseForInputType = useMemo(() => models.filter((m) => passesExcept(m, "inputType")), [models, state]);
 
-  const brandCount = (b: Brand) => count(baseForBrand, (m) => m.brand === b);
   const catCount = (c: Category) => count(baseForCategory, (m) => m.category === c);
   const lineageCount = (lin: Lineage) =>
     count(baseForLineage, (m) => m.lineage === lin);
@@ -297,7 +295,7 @@ export default function FilterRail({
                   disabled={disabled}
                   onClick={() => onState({ brand: active ? null : b })}
                   title={disabled ? `${b} — 이 카탈로그에 제품 없음` : b}
-                  className={`flex min-h-[34px] items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors ${
+                  className={`flex min-h-[44px] items-center justify-center gap-2 rounded-lg border px-2.5 py-2 text-center transition-colors ${
                     active
                       ? "border-transparent bg-lime text-black"
                       : disabled
@@ -306,26 +304,19 @@ export default function FilterRail({
                   }`}
                 >
                   {BRAND_LOGO[b] ? (
-                    // 로고가 있는 브랜드는 텍스트 대신 로고만 표시 (원본 78px 를
-                    // 24px 로 축소 — 억지 확대 없이 object-contain 으로 비율 유지).
-                    // 흰 패드 위에 얹어 lime/흰 버튼 어디서든 또렷하게 보이게 한다.
+                    // 로고가 있는 브랜드는 로고만 표시 (원본 78px 를 축소 — 억지
+                    // 확대 없이 object-contain 으로 비율 유지). 필터 카운트는 로고와
+                    // 겹쳐 표기하지 않는다.
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={BRAND_LOGO[b]}
                       alt={b}
                       loading="lazy"
-                      className="h-12 w-auto max-w-[132px] shrink-0 rounded bg-white object-contain px-1 py-0.5"
+                      className="h-12 w-auto max-w-[140px] object-contain px-1 py-0.5"
                     />
                   ) : (
                     <span className="truncate text-[13px] font-medium">{b}</span>
                   )}
-                  <span
-                    className={`mono ml-2 shrink-0 text-[11px] ${
-                      active ? "text-black" : disabled ? "text-ink-300" : "text-ink-500"
-                    }`}
-                  >
-                    {brandCount(b)}
-                  </span>
                 </button>
               );
             })}
