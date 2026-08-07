@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hasNexarCreds, nexarDetail, type NxPart } from "@/lib/nexar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-// 부품 상세(데이터시트 + 사양).
-//   1순위: Octopart(Altium Nexar) Supply GraphQL API — NEXAR_CLIENT_ID/SECRET 설정 시
-//   2순위(폴백): TrustedParts.com 공식 API 의 정확검색(ExactMatch)
+// 부품 상세(데이터시트 + 사양) — TrustedParts.com 공식 API 의 정확검색(ExactMatch).
 
 const TP_URL = "https://api.trustedparts.com/v2/search";
 
@@ -38,22 +35,6 @@ interface TPPart {
 }
 interface TPResponse { PartResults?: TPPart[] | null; ErrorMessage?: string | null }
 
-// ── Octopart(Nexar) part 목록 → PartDetail 매핑 ─────────────────────────────
-function chooseNexarPart(parts: NxPart[], part: string, mfr: string): NxPart | null {
-  const pl = part.toLowerCase();
-  const ml = mfr.toLowerCase();
-  return (
-    parts.find(
-      (p) =>
-        (p.mpn || "").toLowerCase() === pl &&
-        (!ml || (p.manufacturer?.name || "").toLowerCase().includes(ml)),
-    ) ??
-    parts.find((p) => (p.mpn || "").toLowerCase() === pl) ??
-    parts[0] ??
-    null
-  );
-}
-
 export async function GET(req: NextRequest) {
   const part = (req.nextUrl.searchParams.get("part") || "").trim();
   const mfr = (req.nextUrl.searchParams.get("mfr") || "").trim();
@@ -61,46 +42,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "부품번호가 필요합니다." }, { status: 400 });
   }
 
-  // 1순위: Octopart(Nexar)
-  if (hasNexarCreds()) {
-    try {
-      const parts = await nexarDetail(part, 10);
-      const chosen = chooseNexarPart(parts, part, mfr);
-      if (!chosen) {
-        return NextResponse.json(
-          { error: "해당 부품의 상세 정보를 찾지 못했습니다." },
-          { status: 404 },
-        );
-      }
-      const specs: PartSpec[] = (chosen.specs ?? [])
-        .filter((s) => s.attribute?.name && s.displayValue)
-        .map((s) => ({ field: String(s.attribute!.name), value: String(s.displayValue) }));
-      return NextResponse.json({
-        partNumber: chosen.mpn || part,
-        manufacturer: chosen.manufacturer?.name || mfr,
-        description: chosen.shortDescription || "",
-        datasheetUrl: chosen.bestDatasheet?.url ?? null,
-        specs,
-        sourceUrl:
-          chosen.octopartUrl ||
-          `https://octopart.com/search?q=${encodeURIComponent(part)}`,
-      } satisfies PartDetail);
-    } catch (e) {
-      return NextResponse.json(
-        { error: "Octopart(Nexar) 요청 실패: " + (e instanceof Error ? e.message : String(e)) },
-        { status: 502 },
-      );
-    }
-  }
-
-  // 2순위(폴백): TrustedParts
   const CompanyId = process.env.TRUSTEDPARTS_COMPANY_ID || "";
   const ApiKey = process.env.TRUSTEDPARTS_API_KEY || "";
   if (!CompanyId || !ApiKey) {
     return NextResponse.json(
       {
         error:
-          "가격 조회 API 자격 증명이 없습니다. Octopart(Nexar) 를 쓰려면 NEXAR_CLIENT_ID / NEXAR_CLIENT_SECRET 를, TrustedParts 를 쓰려면 TRUSTEDPARTS_COMPANY_ID / TRUSTEDPARTS_API_KEY 를 설정하세요.",
+          "TrustedParts API 자격 증명이 설정되지 않았습니다 (TRUSTEDPARTS_COMPANY_ID / TRUSTEDPARTS_API_KEY).",
       },
       { status: 503 },
     );

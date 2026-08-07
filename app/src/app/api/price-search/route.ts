@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hasNexarCreds, nexarSearch, type NxPart } from "@/lib/nexar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-// 부품 가격/재고 검색.
-//   1순위: Octopart(Altium Nexar) Supply GraphQL API — NEXAR_CLIENT_ID/SECRET 설정 시
-//   2순위(폴백): TrustedParts.com 공식 Inventory API (v2)
-// 두 소스 모두 동일한 PriceOffer 형태로 매핑해 프론트는 그대로 동작한다.
+// 부품 가격/재고 검색 — TrustedParts.com 공식 Inventory API (v2) 사용.
 //
 // API: POST https://api.trustedparts.com/v2/search  (JSON)
 //   요청은 PascalCase — CompanyId / ApiKey / Queries[{SearchToken}] / CountryCode …
@@ -80,53 +76,6 @@ function credentials() {
   };
 }
 
-// ── Octopart(Nexar) part 목록 → PriceOffer[] 매핑 ───────────────────────────
-function mapNexarOffers(parts: NxPart[]): PriceOffer[] {
-  const offers: PriceOffer[] = [];
-  for (const part of parts) {
-    const specs = (part.specs ?? [])
-      .filter((s) => s.attribute?.name && s.displayValue)
-      .map((s) => ({ field: String(s.attribute!.name), value: String(s.displayValue) }));
-    const datasheetUrl = part.bestDatasheet?.url ?? null;
-    const description = part.shortDescription ?? "";
-    const productUrl = part.octopartUrl ?? null;
-
-    for (const seller of part.sellers ?? []) {
-      for (const offer of seller.offers ?? []) {
-        // 가격은 통화 변환값(convertedPrice)을 우선 사용해 한 통화로 정렬 가능하게 한다.
-        const priceBreaks: PriceBreak[] = (offer.prices ?? [])
-          .map((p) => ({
-            qty: Number(p.quantity),
-            price: Number(p.convertedPrice ?? p.price),
-          }))
-          .filter((b) => Number.isFinite(b.qty) && Number.isFinite(b.price))
-          .sort((a, b) => a.qty - b.qty);
-
-        const first = offer.prices?.[0];
-        const currency = String(
-          first?.convertedCurrency ?? first?.currency ?? process.env.NEXAR_CURRENCY ?? "USD",
-        ).trim();
-
-        offers.push({
-          partNumber: String(part.mpn ?? "").trim(),
-          manufacturer: String(part.manufacturer?.name ?? "").trim(),
-          distributor: String(seller.company?.name ?? "").trim(),
-          stock: Math.max(0, Math.round(Number(offer.inventoryLevel ?? 0)) || 0),
-          currency,
-          unitPrice: priceBreaks.length > 0 ? priceBreaks[0].price : null,
-          priceBreaks,
-          specs,
-          productUrl,
-          datasheetUrl,
-          description,
-          buyUrl: offer.clickUrl ?? null,
-        });
-      }
-    }
-  }
-  return offers;
-}
-
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") || "").trim();
   if (!q) {
@@ -136,33 +85,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "검색어는 2자 이상 입력하세요." }, { status: 400 });
   }
 
-  // 1순위: Octopart(Nexar) — 자격 증명이 있으면 사용
-  if (hasNexarCreds()) {
-    try {
-      const parts = await nexarSearch(q, 20);
-      const offers = mapNexarOffers(parts);
-      return NextResponse.json({
-        query: q,
-        count: offers.length,
-        source: "octopart",
-        sourceUrl: "https://octopart.com",
-        offers,
-      });
-    } catch (e) {
-      return NextResponse.json(
-        { error: "Octopart(Nexar) 요청 실패: " + (e instanceof Error ? e.message : String(e)) },
-        { status: 502 },
-      );
-    }
-  }
-
-  // 2순위(폴백): TrustedParts
   const { CompanyId, ApiKey } = credentials();
   if (!CompanyId || !ApiKey) {
     return NextResponse.json(
       {
         error:
-          "가격 조회 API 자격 증명이 없습니다. Octopart(Nexar) 를 쓰려면 NEXAR_CLIENT_ID / NEXAR_CLIENT_SECRET 를, TrustedParts 를 쓰려면 TRUSTEDPARTS_COMPANY_ID / TRUSTEDPARTS_API_KEY 를 설정하세요.",
+          "TrustedParts API 자격 증명이 설정되지 않았습니다. 환경변수 TRUSTEDPARTS_COMPANY_ID 와 TRUSTEDPARTS_API_KEY 를 설정하세요.",
       },
       { status: 503 },
     );
