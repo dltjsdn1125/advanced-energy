@@ -12,7 +12,7 @@ function BrandTag({ brand }: { brand: Brand | null | undefined }) {
   const logo = BRAND_LOGO[brand];
   if (logo) {
     return (
-      <span className="inline-flex h-4 w-16 items-center justify-end">
+      <span className="inline-flex h-8 w-24 items-center justify-end">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={logo}
@@ -308,7 +308,7 @@ function SpecList({
               {label}
             </dt>
             <dd
-              className={`mono min-w-0 flex-1 truncate text-[12px] leading-tight ${
+              className={`mono min-w-0 flex-1 truncate text-[15px] leading-tight ${
                 empty ? "text-ink-300" : "text-ink-800"
               }`}
             >

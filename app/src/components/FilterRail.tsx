@@ -314,7 +314,7 @@ export default function FilterRail({
                       src={BRAND_LOGO[b]}
                       alt={b}
                       loading="lazy"
-                      className="h-6 w-auto max-w-[112px] shrink-0 rounded bg-white object-contain px-1 py-0.5"
+                      className="h-12 w-auto max-w-[132px] shrink-0 rounded bg-white object-contain px-1 py-0.5"
                     />
                   ) : (
                     <span className="truncate text-[13px] font-medium">{b}</span>

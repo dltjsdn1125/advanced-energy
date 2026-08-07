@@ -2,6 +2,7 @@ import catalogJson from "../../public/data/catalog.json";
 import specsJson from "../../public/data/specs.json";
 import orderingJson from "../../public/data/ordering.json";
 import webImagesJson from "../../public/data/webImages.json";
+import seriesSpecsJson from "../../public/data/seriesSpecs.json";
 import type { Brand, Catalog, Model, OrderingIndex, OrderingTable, SpecIndex, Lineage } from "./types";
 
 // ── 인증번호·표준코드 필터 ────────────────────────────────────────────────────
@@ -420,14 +421,31 @@ function inheritSeriesSpecs(models: Model[]): Model[] {
   });
 }
 
-// 5) 브랜드 + 웹 이미지 부여 — 최종 모델셋 전체에 적용
-//    webImages: modelKey → advancedenergy.com 공식 이미지 URL (Semigate 제품 마스터 기반)
+// 5) Excel(Semigate 제품 마스터) 기반 시리즈 스펙 보강 ─────────────────────────
+// 카탈로그 PDF 에도, 형제 모델에도 입력전압/효율이 없는 부품을 Semigate 제품
+// 마스터의 Subtitle/Description 에서 시리즈 단위로 추출해 채운다 (입력 ~596개 보강).
+const seriesSpecs = seriesSpecsJson as Record<string, { input?: string; eff?: string }>;
+
+// 6) 브랜드 + 웹 이미지 부여 — 최종 모델셋 전체에 적용
 const webImages = webImagesJson as Record<string, string>;
-const filteredModels = inheritSeriesSpecs([...reclassified, ...hvToAdd]).map((m) => ({
-  ...m,
-  brand: classifyBrand(m.model, m.section, m.subcategory),
-  webImage: webImages[m.modelKey] ?? null,
-}));
+const filteredModels = inheritSeriesSpecs([...reclassified, ...hvToAdd]).map((m) => {
+  const ss = seriesSpecs[m.modelKey];
+  let input = m.input;
+  let specMap = m.specMap;
+  if (ss) {
+    if (!input && ss.input) input = ss.input;
+    if (ss.eff && !(specMap?.["효율"] || specMap?.["Efficiency"])) {
+      specMap = { ...(specMap ?? {}), "효율": ss.eff };
+    }
+  }
+  return {
+    ...m,
+    input,
+    specMap,
+    brand: classifyBrand(m.model, m.section, m.subcategory),
+    webImage: webImages[m.modelKey] ?? null,
+  };
+});
 
 // 인증번호·유령 항목을 제외한 실제 제품만 담은 카탈로그를 내보낸다.
 export const catalog: Catalog = {
