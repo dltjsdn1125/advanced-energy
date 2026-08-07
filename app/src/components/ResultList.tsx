@@ -237,100 +237,21 @@ function dimLabel(m: Model): string {
   return DASH;
 }
 
-// ── 스펙 아이콘 ────────────────────────────────────────────────────────────────
-// 텍스트 라벨(Input/Output/…) 대신 SVG 아이콘으로 밀도 있게 표시. 각 행에는
-// 영문 라벨을 title(툴팁)로 붙여 접근성을 유지한다.
-const ICON: React.SVGProps<SVGSVGElement> = {
-  width: 13,
-  height: 13,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-};
-function InputIcon() {
-  return (
-    <svg {...ICON} aria-hidden>
-      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-      <polyline points="10 17 15 12 10 7" />
-      <line x1="15" y1="12" x2="3" y2="12" />
-    </svg>
-  );
-}
-function OutputIcon() {
-  return (
-    <svg {...ICON} aria-hidden>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
-function PowerIcon() {
-  return (
-    <svg {...ICON} fill="currentColor" stroke="none" aria-hidden>
-      <path d="M13 2 3 14h7l-1 8 10-12h-7z" />
-    </svg>
-  );
-}
-function CertIcon() {
-  return (
-    <svg {...ICON} aria-hidden>
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <polyline points="9 12 11 14 15 10" />
-    </svg>
-  );
-}
-function CurrentIcon() {
-  return (
-    <svg {...ICON} aria-hidden>
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-    </svg>
-  );
-}
-function EfficiencyIcon() {
-  return (
-    <svg {...ICON} aria-hidden>
-      <line x1="19" y1="5" x2="5" y2="19" />
-      <circle cx="6.5" cy="6.5" r="2.5" />
-      <circle cx="17.5" cy="17.5" r="2.5" />
-    </svg>
-  );
-}
-function FreqIcon() {
-  return (
-    <svg {...ICON} aria-hidden>
-      <path d="M2 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0" />
-    </svg>
-  );
-}
-function DimIcon() {
-  return (
-    <svg {...ICON} aria-hidden>
-      <polyline points="15 3 21 3 21 9" />
-      <polyline points="9 21 3 21 3 15" />
-      <line x1="21" y1="3" x2="14" y2="10" />
-      <line x1="3" y1="21" x2="10" y2="14" />
-    </svg>
-  );
-}
-
+// ── 카드 스펙 정의 ────────────────────────────────────────────────────────────
+// 각 스펙은 짧은 텍스트 라벨 + 값으로 표시한다 (SVG 아이콘 미사용).
 const SPECS = [
-  { key: "input", label: "Input", Icon: InputIcon, get: inputLabel },
-  { key: "output", label: "Output", Icon: OutputIcon, get: outputLabel },
-  { key: "power", label: "Power", Icon: PowerIcon, get: powerLabel },
-  { key: "current", label: "Current", Icon: CurrentIcon, get: currentLabel },
-  { key: "eff", label: "Efficiency", Icon: EfficiencyIcon, get: efficiencyLabel },
-  { key: "freq", label: "Frequency", Icon: FreqIcon, get: freqLabel },
-  { key: "size", label: "Dimensions", Icon: DimIcon, get: dimLabel },
-  { key: "cert", label: "Cert", Icon: CertIcon, get: certLabel },
+  { key: "input", label: "Input", get: inputLabel },
+  { key: "output", label: "Output", get: outputLabel },
+  { key: "power", label: "Power", get: powerLabel },
+  { key: "current", label: "Current", get: currentLabel },
+  { key: "eff", label: "Eff.", get: efficiencyLabel },
+  { key: "freq", label: "Freq.", get: freqLabel },
+  { key: "size", label: "Size", get: dimLabel },
+  { key: "cert", label: "Cert", get: certLabel },
 ] as const;
 
-// 모든 카드가 공유하는 스펙 목록 — 테두리 없이 아이콘이 라벨을 대신하는 정렬된
-// 2열 그리드. 아이콘 위치가 항상 Input/Output/Power/Cert 순서로 고정돼 질서를 주고,
-// 값이 없는 필드(주로 인증)는 흐리게 처리해 채워진 스펙이 또렷하게 읽히도록 한다.
+// 모든 카드가 공유하는 스펙 목록 — 각 셀은 [라벨] [값]. 라벨은 고정 폭으로 정렬해
+// 값이 같은 열에서 나란히 읽히도록 한다. 값이 없는 필드는 흐리게 처리.
 const SPEC_COLS: Record<number, string> = {
   2: "grid-cols-2",
   3: "grid-cols-2 sm:grid-cols-3",
@@ -347,25 +268,29 @@ function SpecList({
 }) {
   return (
     <dl className={`grid ${SPEC_COLS[cols]} gap-x-4 gap-y-1 ${className}`}>
-      {SPECS.map(({ key, label, Icon, get }) => {
+      {SPECS.map(({ key, label, get }) => {
         const value = get(m);
         const empty = value === DASH;
         return (
           <div
             key={key}
             title={`${label}: ${value}`}
-            className="flex min-w-0 items-center gap-1.5"
+            className="flex min-w-0 items-baseline gap-1.5"
           >
-            <span className={`shrink-0 ${empty ? "text-ink-200" : "text-ink-400"}`}>
-              <Icon />
-            </span>
-            <span
-              className={`mono truncate text-[12px] leading-tight ${
-                empty ? "text-ink-300" : "text-ink-700"
+            <dt
+              className={`w-12 shrink-0 text-[10px] font-semibold uppercase tracking-wide ${
+                empty ? "text-ink-300" : "text-ink-500"
+              }`}
+            >
+              {label}
+            </dt>
+            <dd
+              className={`mono min-w-0 flex-1 truncate text-[12px] leading-tight ${
+                empty ? "text-ink-300" : "text-ink-800"
               }`}
             >
               {value}
-            </span>
+            </dd>
           </div>
         );
       })}
@@ -410,7 +335,7 @@ export default function ResultList({
                 <div className="flex w-full items-center gap-3">
                   <Thumb m={m} active={active} />
                   <div className="min-w-0 flex-1">
-                    <div className="mono break-words text-[20px] font-semibold leading-tight text-black">
+                    <div className="mono break-words text-[16px] font-semibold leading-tight text-black">
                       {m.model}
                     </div>
                     <div className="label !normal-case !tracking-normal !text-ink-500">
@@ -451,7 +376,7 @@ export default function ResultList({
                 <Thumb m={m} active={isActive} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                    <span className="mono break-words text-[20px] font-semibold leading-tight text-black">
+                    <span className="mono break-words text-[16px] font-semibold leading-tight text-black">
                       {m.model}
                     </span>
                     <span className="label !normal-case !tracking-normal !text-ink-500 truncate">
